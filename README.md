@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Invenpro – Smart Inventory & Expense Management System
 
 [![Python 3.14](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/)
@@ -241,3 +242,6 @@ python manage.py test
 ```
 *Result: 14 passing tests (`OK`).*
 
+=======
+# Invenpro
+>>>>>>> 86141293baa761cddbca65b09e10592aa55369ab
