@@ -1,0 +1,971 @@
+================================================================================
+          INVENPRO – SMART RESTAURANT INVENTORY & STOCK CONTROL SYSTEM
+               COMPREHENSIVE BACKEND ARCHITECTURE & ACTIONS MANUAL
+================================================================================
+Project: Invenpro Multi-Tenant Restaurant Inventory Management
+Student: MUHAMMED PP (Reg No: 12324844) | B. Tech CSE
+Institution: Lovely Professional University (LPU), Phagwara, Punjab
+Course: INT253 – Advanced Python Programming / Web Application Development
+================================================================================
+
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+SECTION 1: SYSTEM ARCHITECTURE & MULTI-TENANT ISOLATION
+  Q01. How does Invenpro achieve multi-tenant data isolation across restaurants?
+  Q02. How are unique alphanumeric Restaurant IDs generated and allocated?
+
+SECTION 2: ROLE-BASED ACCESS CONTROL (RBAC) & SECURITY DECORATORS
+  Q03. How is the 3-tier user hierarchy (Developer, Admin, Staff) structured?
+  Q04. How do custom decorators (@admin_required, @developer_required) enforce permissions?
+  Q05. Which specific endpoints and actions are locked away from Kitchen Staff?
+
+SECTION 3: AUTHENTICATION, DUAL PORTALS & LIVE EMAIL OTP SUBSYSTEM
+  Q06. How does the Dual-Portal login system distinguish between Admin and Staff?
+  Q07. How does the live SMTP Email OTP verification system work for Admin password resets?
+  Q08. How does the Staff Password Assistance request escalation work?
+
+SECTION 4: INVENTORY CATALOG, CATEGORIES & SUPPLIERS
+  Q09. How does Product catalog creation, editing, and real-time valuation work?
+  Q10. How are Category departments and Supplier registries managed and tenant-scoped?
+
+SECTION 5: TRANSACTIONS, ATOMIC LEDGER & ZERO-NEGATIVE STOCK ENFORCEMENT
+  Q11. How does the Atomic Stock-In (Purchase Intake) mechanism execute?
+  Q12. How does Atomic Kitchen Stock-Out prevent negative stock with Fast Presets?
+  Q13. How do Physical Stock Audits and Discrepancy Adjustments work?
+
+SECTION 6: INTELLIGENT RUNWAY ENGINE & PREDICTIVE BURN-RATE ALGORITHM
+  Q14. How does the trailing 7-day burn rate and days-to-depletion forecast calculate?
+  Q15. How does the system handle division-by-zero when an item has zero consumption?
+
+SECTION 7: OPERATING EXPENSES & EXECUTIVE FINANCIAL ANALYTICS
+  Q16. How does the Operating Expense tracking subsystem function?
+  Q17. How does the Executive Reports & Analytics Hub generate metrics and CSV files?
+
+SECTION 8: MULTI-CURRENCY FOREX LOCALIZATION & CONTEXT PROCESSORS
+  Q18. How does Dynamic Multi-Currency Forex conversion work without altering base data?
+  Q19. How does the global stock alert context processor inject data into every template?
+
+SECTION 9: DEVELOPER IMPERSONATION & WORKSPACE LIFECYCLE
+  Q20. How does Developer Impersonation allow switching between restaurant workspaces?
+  Q21. How does the backend automatically delete orphaned restaurants when the sole admin is deleted?
+
+================================================================================
+
+
+================================================================================
+SECTION 1: SYSTEM ARCHITECTURE & MULTI-TENANT ISOLATION
+================================================================================
+
+Q01. How does Invenpro achieve multi-tenant data isolation across restaurants?
+--------------------------------------------------------------------------------
+ANSWER:
+Invenpro deploys a logical multi-tenancy architecture within a shared relational database. 
+Every core domain model (Product, Category, Supplier, StockTransaction, Expense, and 
+UserProfile) maintains a foreign-key relationship pointing directly to the `Restaurant` entity.
+
+When an authenticated user issues a request:
+1. The user's associated restaurant is retrieved via `user.profile.restaurant`.
+2. A utility function `scope_queryset(request, queryset, restaurant_field='restaurant')` 
+   automatically applies a filter `.filter(restaurant=profile.restaurant)`.
+3. If a staff member or admin attempts to read, edit, or delete a record using a direct URL 
+   parameter (e.g., `/products/edit/45/`), the queryset query checks `id=45` AND 
+   `restaurant=user.profile.restaurant`. If the record belongs to another restaurant tenant, 
+   the query raises a `Http404` exception, completely preventing cross-tenant data leakage.
+
+EXACT FILE PATH:
+accounts/utils.py
+
+EXACT CODE:
+```python
+def scope_queryset(request, queryset, restaurant_field='restaurant'):
+    """
+    Restricts a queryset strictly to the active restaurant tenant.
+    - For Admins and Staff: strictly locked to their own restaurant (zero data leakage).
+    - For Developers:
+      - If a specific restaurant is selected in the header dropdown, scopes to that restaurant!
+      - If 'all' or global view is selected, returns all records across all restaurants.
+    """
+    if not request.user.is_authenticated:
+        return queryset.none()
+
+    profile = getattr(request.user, 'profile', None)
+    if not profile:
+        return queryset.none()
+
+    # Developer view: driven by session toggle (defaults to first restaurant)
+    if profile.is_developer:
+        active_id = request.session.get('developer_active_restaurant_id')
+        if active_id and active_id != 'all':
+            return queryset.filter(**{f"{restaurant_field}__restaurant_id": active_id})
+        first_rest = Restaurant.objects.order_by('id').first()
+        if first_rest:
+            request.session['developer_active_restaurant_id'] = first_rest.restaurant_id
+            return queryset.filter(**{f"{restaurant_field}__restaurant_id": first_rest.restaurant_id})
+        return queryset
+
+    # Admins and Staff: strictly locked to their own restaurant
+    if profile.restaurant:
+        return queryset.filter(**{restaurant_field: profile.restaurant})
+
+    return queryset.none()
+```
+
+--------------------------------------------------------------------------------
+Q02. How are unique alphanumeric Restaurant IDs generated and allocated?
+--------------------------------------------------------------------------------
+ANSWER:
+When a new restaurant is registered in Invenpro, an alphanumeric identifier (such as `RES-85790` 
+or `RES-61410`) is generated automatically inside the `save()` method of the `Restaurant` model.
+
+The method generates a random 5-digit number, prefixes it with `RES-`, and checks the database 
+using `.exists()` to guarantee uniqueness before persisting. Once assigned, this identifier is 
+marked as `editable=False` to prevent tampering.
+
+EXACT FILE PATH:
+accounts/models.py
+
+EXACT CODE:
+```python
+class Restaurant(models.Model):
+    restaurant_id = models.CharField(max_length=20, unique=True, editable=False)
+    name = models.CharField(max_length=150, verbose_name="Restaurant Name")
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='owned_restaurants')
+    phone = models.CharField(max_length=30, blank=True)
+    address = models.TextField(blank=True, verbose_name="Restaurant Address")
+    gst_number = models.CharField(max_length=50, blank=True, verbose_name="GSTIN / Tax ID")
+    currency = models.CharField(max_length=10, default='INR')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.restaurant_id:
+            import random
+            while True:
+                candidate = f"RES-{random.randint(10000, 99999)}"
+                if not Restaurant.objects.filter(restaurant_id=candidate).exists():
+                    self.restaurant_id = candidate
+                    break
+        super().save(*args, **kwargs)
+```
+
+
+================================================================================
+SECTION 2: ROLE-BASED ACCESS CONTROL (RBAC) & SECURITY DECORATORS
+================================================================================
+
+Q03. How is the 3-tier user hierarchy (Developer, Admin, Staff) structured?
+--------------------------------------------------------------------------------
+ANSWER:
+Invenpro establishes a clean separation of roles using the `UserProfile` model, which extends 
+Django's built-in `User` entity via a `OneToOneField`. The three roles are:
+
+1. `developer` (💻 Developer / Super Admin):
+   - Global platform oversight across all restaurant workspaces.
+   - Can provision new restaurants, inspect any tenant workspace, view plain-text reference 
+     passwords for administrative support, edit admin credentials, and delete tenants.
+2. `admin` (👑 Restaurant Admin / Owner):
+   - Executive manager of a single restaurant workspace.
+   - Has full access to financial valuations, expense tracking, catalog CRUD, category/supplier 
+     management, CSV reporting, store settings, and staff user management.
+3. `staff` (👨‍🍳 Staff / Inventory Operator):
+   - Kitchen line cooks and pantry supervisors.
+   - Has operational access: rapid stock-out logging via Fast Presets, receiving incoming 
+     deliveries (Stock-In), and monitoring stock health counts.
+   - Strictly blocked from seeing purchasing prices, item valuations, store settings, 
+     operating expenses, and financial CSV exports.
+
+EXACT FILE PATH:
+accounts/models.py
+
+EXACT CODE:
+```python
+class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ('developer', '💻 Developer / Super Admin'),
+        ('admin', '👑 Restaurant Admin / Owner'),
+        ('staff', '👨‍🍳 Staff / Inventory Operator'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, null=True, blank=True, related_name='members')
+    
+    @property
+    def is_developer(self):
+        return self.role == 'developer' or self.user.is_superuser
+
+    @property
+    def is_restaurant_admin(self):
+        return self.role in ['admin', 'developer'] or self.user.is_superuser
+
+    @property
+    def is_admin(self):
+        return self.is_restaurant_admin
+```
+
+--------------------------------------------------------------------------------
+Q04. How do custom decorators (@admin_required, @developer_required) enforce permissions?
+--------------------------------------------------------------------------------
+ANSWER:
+Backend endpoints are protected by Python function decorators that intercept incoming HTTP 
+requests before view code executes:
+1. `developer_required`: Verifies `request.user.is_authenticated`. If not authenticated, redirects 
+   to `login`. Checks if `request.user.is_superuser` or `profile.is_developer`. If false, emits a 
+   flash error message ("Access denied: This section is restricted to System Developers only.") 
+   and redirects to `dashboard`.
+2. `admin_required`: Verifies `request.user.is_authenticated`. Checks `profile.is_admin` 
+   (`admin` or `developer`). If a `staff` member attempts access, the decorator blocks execution, 
+   emits a flash message ("Access denied: This section is restricted to Restaurant Admins only."), 
+   and redirects to `dashboard`.
+
+EXACT FILE PATH:
+accounts/decorators.py
+
+EXACT CODE:
+```python
+from functools import wraps
+from django.shortcuts import redirect
+from django.contrib import messages
+
+def developer_required(view_func):
+    """
+    Restricts access strictly to System Developers / SuperUsers.
+    Restaurant Admins and Staff are blocked.
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        profile = getattr(request.user, 'profile', None)
+        if profile and profile.is_developer:
+            return view_func(request, *args, **kwargs)
+        
+        messages.error(request, "Access denied: This section is restricted to System Developers only.")
+        return redirect('dashboard')
+    return _wrapped_view
+
+def admin_required(view_func):
+    """
+    Restricts access strictly to Restaurant Admins / Owners and Developers.
+    Staff members are blocked from staff management, settings, and destructive actions.
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        profile = getattr(request.user, 'profile', None)
+        if profile and profile.is_admin:
+            return view_func(request, *args, **kwargs)
+        
+        messages.error(request, "Access denied: This section is restricted to Restaurant Admins only.")
+        return redirect('dashboard')
+    return _wrapped_view
+```
+
+--------------------------------------------------------------------------------
+Q05. Which specific endpoints and actions are locked away from Kitchen Staff?
+--------------------------------------------------------------------------------
+ANSWER:
+The following endpoints apply `@admin_required` and will strictly reject kitchen staff:
+- Settings & Currency Exchange: `/settings/`, `/settings/toggle-theme/`
+- Operating Expenses (All CRUD): `/expenses/`, `/expenses/add/`, `/expenses/<id>/edit/`, `/expenses/<id>/delete/`
+- Executive Financial Reports & CSV Exports: `/reports/`, `/reports/export/valuation/`, `/reports/export/stock-in/`, `/reports/export/stock-out/`, `/reports/export/expenses/`
+- Product Management (Create, Edit, Delete): `/products/add/`, `/products/<id>/edit/`, `/products/<id>/delete/`
+- Category & Supplier Management: `/categories/add/`, `/categories/<id>/edit/`, `/suppliers/add/`, etc.
+- Physical Stock Adjustments: `/transactions/adjust/`
+- Staff User Management: `/staff/`, `/accounts/staff/delete/<id>/`, `/accounts/staff/reset-password/<id>/`
+
+In addition, on views accessible to staff (such as Dashboard, Product List, and Transaction History), 
+template conditional checks `{% if is_restaurant_admin %}` dynamically conceal purchase unit prices, 
+asset valuations, and profit/loss figures from kitchen workers.
+
+
+================================================================================
+SECTION 3: AUTHENTICATION, DUAL PORTALS & LIVE EMAIL OTP SUBSYSTEM
+================================================================================
+
+Q06. How does the Dual-Portal login system distinguish between Admin and Staff?
+--------------------------------------------------------------------------------
+ANSWER:
+Invenpro provides two specialized entry points:
+1. `login_view()` (`/login/`): Primary portal for Restaurant Admins and System Developers. 
+   If a user with a `staff` role attempts to log in here, the backend intercepts them, verifies 
+   their credentials, but displays an informational notice advising them to switch to the Staff Portal.
+2. `staff_login_view()` (`/staff-login/`): Tailored for fast-paced kitchen tablet authentication. 
+   When staff log in, their session immediately routes to the operational Dashboard configured 
+   with streamlined kitchen health widgets and quick stock buttons.
+
+EXACT FILE PATH:
+accounts/views.py
+
+EXACT CODE:
+```python
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['username']
+            password = form.cleaned_data['password']
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                profile = getattr(user, 'profile', None)
+                if profile and profile.role == 'staff':
+                    messages.info(request, f"Welcome {user.first_name or user.username}. Switched to Kitchen Staff workspace.")
+                else:
+                    messages.success(request, f"Welcome back, {user.first_name or user.username}!")
+                return redirect('dashboard')
+            else:
+                messages.error(request, "Invalid username or password.")
+    else:
+        form = LoginForm()
+    return render(request, 'accounts/login.html', {'form': form, 'portal_type': 'admin'})
+```
+
+--------------------------------------------------------------------------------
+Q07. How does the live SMTP Email OTP verification system work for Admin password resets?
+--------------------------------------------------------------------------------
+ANSWER:
+Administrative account recovery uses a 3-step secure live SMTP email OTP pipeline:
+
+Step 1: Request OTP (`forgot_password_request_view` -> `/forgot-password/`):
+- The admin enters their registered email address.
+- The backend checks `User.objects.filter(email__iexact=email)`.
+- If found, `_create_and_dispatch_otp(user, request)` generates a cryptographically random 
+  6-digit numeric code using `secrets.randbelow(900000) + 100000`.
+- It sets an expiration timestamp at `timezone.now() + timedelta(minutes=10)`.
+- A new record is committed to `PasswordResetOTP`.
+- `send_mail()` dispatches a high-contrast HTML email via Google SMTP (TLS port 587) containing 
+  the 6-digit code.
+- Session keys `password_reset_user_id` and `password_reset_otp_id` are saved, and the browser 
+  is redirected to the verification view.
+
+Step 2: Verify OTP (`forgot_password_verify_view` -> `/forgot-password/verify/`):
+- The admin enters the 6-digit OTP.
+- The backend retrieves the OTP record.
+- It validates: `not otp.is_used`, `not otp.is_expired`, and `otp.attempts < 5`.
+- If matched, `otp.is_used = True`, `otp.save()`, and session flag `password_reset_verified = True` 
+  is granted. Redirects to reset form.
+
+Step 3: Reset Password (`forgot_password_reset_view` -> `/forgot-password/reset/`):
+- Verifies session flag `password_reset_verified == True`.
+- Calls `user.set_password(new_password)`. This hashes the password with PBKDF2/SHA-256.
+- Updates `profile.display_password = new_password` (for developer support visibility).
+- Clears temporary session variables and redirects to `/login/` with success confirmation.
+
+EXACT FILE PATH:
+accounts/views.py & accounts/notifications.py
+
+EXACT CODE:
+```python
+def _create_and_dispatch_otp(user, request):
+    import secrets
+    otp_code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = timezone.now() + timedelta(minutes=10)
+
+    otp = PasswordResetOTP.objects.create(
+        user=user,
+        otp_code=otp_code,
+        channel='email',
+        destination=user.email,
+        expires_at=expires_at
+    )
+
+    subject = f"[Invenpro] {otp_code} is your Password Reset Verification Code"
+    message = (
+        f"Hello {user.first_name or user.username},\n\n"
+        f"Your 6-digit Invenpro verification code is: {otp_code}\n\n"
+        f"This code is valid for 10 minutes. If you did not request this, please ignore this email.\n\n"
+        f"Best regards,\nInvenpro Security Team"
+    )
+    from django.core.mail import send_mail
+    from django.conf import settings
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'mamuedits@gmail.com'),
+            recipient_list=[user.email],
+            fail_silently=False
+        )
+        return otp, True
+    except Exception as e:
+        return otp, False
+```
+
+--------------------------------------------------------------------------------
+Q08. How does the Staff Password Assistance request escalation work?
+--------------------------------------------------------------------------------
+ANSWER:
+Kitchen staff do not have personal email accounts registered on the system. If staff were allowed 
+self-service OTP resets, unauthorized staff could hijack kitchen accounts.
+
+Instead:
+1. When staff click "Forgot Password?", they submit their username and restaurant ID via 
+   `staff_forgot_password_view()`.
+2. The backend creates an audit record in `StaffPasswordRequest`.
+3. It finds the Restaurant Admin's email for that restaurant.
+4. It dispatches an automated notification email directly to the Restaurant Admin:
+   "Staff member [username] has requested a password reset for restaurant [name]."
+5. The Admin logs into the Admin Management roster (`/staff/`), views the staff user, and sets 
+   a new password, which they communicate directly to the kitchen worker.
+
+EXACT FILE PATH:
+accounts/views.py
+
+EXACT CODE:
+```python
+def staff_forgot_password_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        restaurant_id = request.POST.get('restaurant_id', '').strip()
+
+        user = User.objects.filter(username__iexact=username).first()
+        rest = Restaurant.objects.filter(restaurant_id__iexact=restaurant_id).first()
+
+        if user and rest and hasattr(user, 'profile') and user.profile.restaurant == rest:
+            admin_profiles = UserProfile.objects.filter(restaurant=rest, role='admin')
+            admin_email = admin_profiles.first().user.email if admin_profiles.exists() else ''
+
+            StaffPasswordRequest.objects.create(
+                staff_user=user,
+                restaurant=rest,
+                admin_email=admin_email,
+                staff_note="Staff member requested password assistance from portal."
+            )
+            if admin_email:
+                send_mail(
+                    subject=f"[Invenpro Alert] Password Reset Request for Staff: {user.username}",
+                    message=f"Staff member '{user.username}' at {rest.name} ({rest.restaurant_id}) has requested a password reset.\nPlease log in to Admin Management to update their credentials.",
+                    from_email='mamuedits@gmail.com',
+                    recipient_list=[admin_email],
+                    fail_silently=True
+                )
+            messages.success(request, "Password assistance request dispatched to your Restaurant Admin.")
+            return redirect('staff_login')
+```
+
+
+================================================================================
+SECTION 4: INVENTORY CATALOG, CATEGORIES & SUPPLIERS
+================================================================================
+
+Q09. How does Product catalog creation, editing, and real-time valuation work?
+--------------------------------------------------------------------------------
+ANSWER:
+The `Product` entity stores the master catalog definition. Crucially, pricing and stock balances 
+are stored in standard decimal precision:
+- `purchase_price`: Unit purchase price stored in base Indian Rupees (INR).
+- `current_stock`: Real-time on-hand quantity.
+- `minimum_stock`: Threshold buffer for low-stock warnings.
+
+Real-Time Valuation:
+Valuation is evaluated dynamically via a Python property:
+```python
+@property
+def stock_value(self):
+    return self.current_stock * self.purchase_price
+```
+This guarantees that valuation updates instantaneously upon every Stock-In, Stock-Out, or Audit 
+Adjustment without needing database sync jobs.
+
+Permissions:
+- Viewing product catalog (`product_list_view`): Allowed for all authenticated roles.
+- Adding product (`product_create_view`): Locked with `@admin_required`.
+- Updating product (`product_update_view`): Locked with `@admin_required`.
+- Deleting product (`product_delete_view`): Locked with `@admin_required`.
+
+EXACT FILE PATH:
+inventory/models.py & inventory/views.py
+
+EXACT CODE:
+```python
+# inventory/models.py
+class Product(models.Model):
+    restaurant = models.ForeignKey('accounts.Restaurant', on_delete=models.CASCADE, null=True, blank=True, related_name='products')
+    name = models.CharField(max_length=150)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
+    unit = models.CharField(max_length=20, choices=UNIT_CHOICES, default='kg')
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    current_stock = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    minimum_stock = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('5.00'))
+    
+    @property
+    def stock_value(self):
+        return self.current_stock * self.purchase_price
+
+    @property
+    def stock_status(self):
+        if self.current_stock <= Decimal('0'):
+            return 'Out of Stock'
+        elif self.current_stock <= self.minimum_stock:
+            return 'Low Stock'
+        return 'Healthy'
+
+# inventory/views.py
+@admin_required
+def product_create_view(request):
+    restaurant = get_user_restaurant(request)
+    if request.method == 'POST':
+        form = ProductForm(request.POST, restaurant=restaurant)
+        if form.is_valid():
+            product = form.save(commit=False)
+            product.restaurant = restaurant
+            product.save()
+            messages.success(request, f"Product '{product.name}' created successfully!")
+            return redirect('product_list')
+```
+
+--------------------------------------------------------------------------------
+Q10. How are Category departments and Supplier registries managed and tenant-scoped?
+--------------------------------------------------------------------------------
+ANSWER:
+Categories (e.g., Grains & Flours, Cooking Oils, Spices, Disposables) and Suppliers are scoped 
+to each restaurant.
+- In `Category`, the `unique_together = ('restaurant', 'name')` database constraint ensures 
+  that two restaurants can each have a category named "Beverages" without conflict.
+- Adding/editing categories and suppliers is restricted to Admins via `@admin_required`.
+- When viewing categories, the property `.product_count` queries `self.products.count()` to 
+  display real-time product counts per department.
+
+EXACT FILE PATH:
+inventory/models.py
+
+
+================================================================================
+SECTION 5: TRANSACTIONS, ATOMIC LEDGER & ZERO-NEGATIVE STOCK ENFORCEMENT
+================================================================================
+
+Q11. How does the Atomic Stock-In (Purchase Intake) mechanism execute?
+--------------------------------------------------------------------------------
+ANSWER:
+When incoming inventory is delivered by a vendor, the user submits `stock_in_view()`.
+The backend executes the following atomic sequence:
+1. Ingests Product, Supplier, Quantity, and Unit Purchase Price.
+2. Converts the entered price into base Indian Rupees (INR) using `profile.convert_to_base()` 
+   if the restaurant is viewing in USD, EUR, GBP, or AED.
+3. Invokes `StockTransaction.record_stock_in(product, quantity, unit_price, user, supplier, notes)`.
+4. Inside `record_stock_in`:
+   - `@transaction.atomic` initiates a database transaction.
+   - `Product.objects.select_for_update().get(pk=product.pk)` locks the product row in the database, 
+     preventing race conditions from concurrent terminal writes.
+   - Updates stock: `prod.current_stock += quantity`.
+   - Updates purchase price: `prod.purchase_price = unit_price`.
+   - Creates an immutable `StockTransaction` record with `transaction_type='IN'` and 
+     `total_amount = quantity * unit_price`.
+5. Upon successful commit, a flash message confirms the updated stock balance.
+
+EXACT FILE PATH:
+transactions/models.py & transactions/views.py
+
+EXACT CODE:
+```python
+@classmethod
+@transaction.atomic
+def record_stock_in(cls, product, quantity, unit_price, user, supplier=None, notes=""):
+    """
+    Atomically records a Stock-In transaction and updates product stock and price.
+    Formula: New Stock = Current Stock + Quantity
+    """
+    if quantity <= Decimal('0'):
+        raise ValidationError("Quantity must be greater than zero.")
+    
+    # Lock product row for update
+    prod = Product.objects.select_for_update().get(pk=product.pk)
+    prod.current_stock += quantity
+    if unit_price > Decimal('0'):
+        prod.purchase_price = unit_price
+    prod.save()
+
+    tx = cls.objects.create(
+        restaurant=prod.restaurant,
+        product=prod,
+        supplier=supplier,
+        user=user,
+        transaction_type='IN',
+        quantity=quantity,
+        unit_price=unit_price,
+        total_amount=quantity * unit_price,
+        notes=notes
+    )
+    return tx
+```
+
+--------------------------------------------------------------------------------
+Q12. How does Atomic Kitchen Stock-Out prevent negative stock with Fast Presets?
+--------------------------------------------------------------------------------
+ANSWER:
+Stock-Out represents kitchen ingredient consumption. In high-pressure culinary rushes, 
+a major source of data corruption is negative stock balances caused by duplicate or excess 
+logging.
+
+Invenpro implements a strict, two-tier validation barrier:
+1. Fast Presets & Station Shortcuts (UI Layer):
+   - Fast Preset buttons (+1, +2, +5, +10) let cooks tap increments without typing.
+   - Station shortcut pills ("Kitchen Prep", "Service Rush", "Tasting / Sample", "Staff Meal", 
+     "Waste") populate standardized notes.
+   - A live JavaScript preview card displays "Projected Remaining Stock".
+2. Server-Side Zero-Negative Guard (Backend Layer):
+   - In `StockTransaction.record_stock_out()`:
+     ```python
+     prod = Product.objects.select_for_update().get(pk=product.pk)
+     if quantity > prod.current_stock:
+         raise ValidationError(f"Insufficient stock! Requested: {quantity}, available: {prod.current_stock}")
+     ```
+   - If a cook attempts to deduct 15 kg when only 10 kg exists, the transaction rolls back 
+     instantly. An error banner is displayed, and the database balance remains untouched.
+   - If valid, `prod.current_stock -= quantity` commits atomically.
+
+EXACT FILE PATH:
+transactions/models.py & transactions/views.py
+
+EXACT CODE:
+```python
+@classmethod
+@transaction.atomic
+def record_stock_out(cls, product, quantity, user, notes="", unit_price=None):
+    """
+    Atomically records a Stock-Out transaction and updates product stock.
+    Validation: Prevents stock from dropping below zero.
+    Formula: New Stock = Current Stock - Quantity
+    """
+    if quantity <= Decimal('0'):
+        raise ValidationError("Quantity must be greater than zero.")
+    
+    prod = Product.objects.select_for_update().get(pk=product.pk)
+    if quantity > prod.current_stock:
+        raise ValidationError(
+            f"Insufficient stock! Requested: {quantity} {prod.unit}, but only {prod.current_stock} {prod.unit} available."
+        )
+
+    prod.current_stock -= quantity
+    prod.save()
+
+    price = unit_price if unit_price is not None else prod.purchase_price
+
+    tx = cls.objects.create(
+        restaurant=prod.restaurant,
+        product=prod,
+        supplier=None,
+        user=user,
+        transaction_type='OUT',
+        quantity=quantity,
+        unit_price=price,
+        total_amount=quantity * price,
+        notes=notes
+    )
+    return tx
+```
+
+--------------------------------------------------------------------------------
+Q13. How do Physical Stock Audits and Discrepancy Adjustments work?
+--------------------------------------------------------------------------------
+ANSWER:
+Periodic physical counts often reveal discrepancies caused by unrecorded spillage, spoilage, 
+or trimming loss.
+- `stock_adjustment_view()` is strictly restricted to Admins via `@admin_required`.
+- The user inputs the actual physical count (`target_quantity`) and selects a mandatory 
+  reason from structured choices:
+  - `Physical Count Correction`
+  - `Kitchen Spillage`
+  - `Spoilage / Expiry`
+  - `Supplier Short Delivery`
+  - `Prep / Trimming Loss`
+  - `Staff Meal / Tasting Variance`
+- The backend calculates the delta `delta = target_quantity - old_stock`.
+- It atomically sets `prod.current_stock = target_quantity` and commits a ledger transaction 
+  with `transaction_type='ADJUSTMENT'` capturing the discrepancy amount and the selected reason.
+
+EXACT FILE PATH:
+transactions/models.py & transactions/views.py
+
+
+================================================================================
+SECTION 6: INTELLIGENT RUNWAY ENGINE & PREDICTIVE BURN-RATE ALGORITHM
+================================================================================
+
+Q14. How does the trailing 7-day burn rate and days-to-depletion forecast calculate?
+--------------------------------------------------------------------------------
+ANSWER:
+Static stock alerts fail because they do not account for consumption velocity. Invenpro 
+calculates a dynamic moving consumption forecast via `Product.get_consumption_analysis(days=7)`:
+
+1. Rolling Window:
+   `cutoff_date = timezone.now() - timedelta(days=7)`
+2. Aggregate Outflow:
+   Filters `StockTransaction` records where `product=self`, `transaction_type='OUT'`, and 
+   `created_at >= cutoff_date`.
+   Summates total consumed quantity: $C_{7d} = \sum 	ext{quantity}$.
+3. Average Daily Burn Rate:
+   $$R_{daily} = rac{C_{7d}}{7.0}$$
+4. Depletion Runway in Days:
+   $$	ext{Days Left} = rac{	ext{Current Stock}}{R_{daily}}$$
+5. Urgency Classification:
+   - `critical`: Current stock <= 0 OR Days Left <= 2.0 days (Urgent restock needed).
+   - `warning`: Days Left <= 5.0 days OR Current Stock <= Minimum Buffer.
+   - `healthy`: Days Left > 5.0 days AND Current Stock > Minimum Buffer.
+6. Recommended Restock Quantity:
+   Computes minimum replenishment to restore a comfortable 14-day operating runway:
+   $$	ext{Restock Qty} = \max\left(R_{daily} 	imes 14 - 	ext{Current Stock}, 	ext{Minimum Stock}ight)$$
+
+EXACT FILE PATH:
+inventory/models.py
+
+EXACT CODE:
+```python
+def get_consumption_analysis(self, days=7):
+    from transactions.models import StockTransaction
+    cutoff_date = timezone.now() - timedelta(days=days)
+    
+    out_transactions = StockTransaction.objects.filter(
+        product=self,
+        transaction_type='OUT',
+        created_at__gte=cutoff_date
+    )
+    total_consumed = sum((tx.quantity for tx in out_transactions), Decimal('0.00'))
+    avg_daily = total_consumed / Decimal(str(days))
+    
+    if avg_daily > Decimal('0.00'):
+        days_left = float(self.current_stock / avg_daily)
+        days_left_rounded = round(days_left, 1)
+    else:
+        days_left = None
+        days_left_rounded = None
+
+    if self.current_stock <= Decimal('0'):
+        urgency = 'critical'
+        urgency_label = 'Depleted (Order Immediately)'
+    elif days_left is not None and days_left <= 2.0:
+        urgency = 'critical'
+        urgency_label = f'Critical (~{days_left_rounded} days left)'
+    elif (days_left is not None and days_left <= 5.0) or (self.current_stock <= self.minimum_stock):
+        urgency = 'warning'
+        urgency_label = f'Low Stock (~{days_left_rounded} days left)' if days_left else 'Low Stock (Below Buffer)'
+    else:
+        urgency = 'healthy'
+        urgency_label = f'Healthy (~{days_left_rounded} days left)' if days_left else 'Healthy Buffer'
+
+    return {
+        'days': days,
+        'total_consumed': total_consumed,
+        'avg_daily_consumption': avg_daily,
+        'days_left': days_left,
+        'days_left_rounded': days_left_rounded,
+        'urgency': urgency,
+        'urgency_label': urgency_label,
+        'recommended_restock': max(Decimal('0.00'), (avg_daily * Decimal('14')) - self.current_stock)
+    }
+```
+
+--------------------------------------------------------------------------------
+Q15. How does the system handle division-by-zero when an item has zero consumption?
+--------------------------------------------------------------------------------
+ANSWER:
+If an ingredient experienced zero kitchen consumption over the past 7 days, `avg_daily` is `0.00`. 
+Attempting `current_stock / avg_daily` would raise a `ZeroDivisionError` crash in Python.
+
+Invenpro defends against this with an explicit guard:
+```python
+if avg_daily > Decimal('0.00'):
+    days_left = float(self.current_stock / avg_daily)
+else:
+    days_left = None
+```
+When `days_left` is `None`, the template renders a clean infinity/steady indicator (`--`), and 
+the product is evaluated purely against its static minimum buffer.
+
+
+================================================================================
+SECTION 7: OPERATING EXPENSES & EXECUTIVE FINANCIAL ANALYTICS
+================================================================================
+
+Q16. How does the Operating Expense tracking subsystem function?
+--------------------------------------------------------------------------------
+ANSWER:
+A restaurant's true profitability depends on non-inventory operational overheads (wages, gas, 
+electricity, rent, packaging).
+- The `Expense` model categorizes expenditures: `rent`, `utilities`, `wages`, `repairs`, 
+  `packaging`, `marketing`, `cleaning`, and `other`.
+- Access is strictly gated: All views (`expense_list_view`, `expense_create_view`, 
+  `expense_update_view`, `expense_delete_view`) are decorated with `@admin_required`.
+- Pricing Conversion: If an admin registers an expense while their display currency is USD, 
+  the backend converts it to base INR (`profile.convert_to_base(amount)`) before saving, ensuring 
+  underlying accounting consistency.
+
+EXACT FILE PATH:
+expenses/models.py & expenses/views.py
+
+--------------------------------------------------------------------------------
+Q17. How does the Executive Reports & Analytics Hub generate metrics and CSV files?
+--------------------------------------------------------------------------------
+ANSWER:
+The reporting hub (`/reports/`) aggregates restaurant metrics across selectable date ranges 
+(Today, Last 7 Days, This Month, Last Month, Custom Range):
+1. Aggregates:
+   - Total Purchases Inflow: Sum of `StockTransaction` (type='IN') total amounts.
+   - Total Kitchen Usage Cost: Sum of `StockTransaction` (type='OUT') total amounts.
+   - Total Operational Overheads: Sum of `Expense` amounts.
+2. Visual Visualizations:
+   - Top 10 Consumed Products by Value (Horizontal Bar Chart).
+   - Operational Expenses by Category (Doughnut Chart).
+3. Streaming CSV Exports:
+   Endpoints stream real-time CSV files formatted with active currency symbols and headers:
+   - `export_inventory_valuation_csv`: SKU, Name, Category, Stock, Unit, Purchase Price, Valuation.
+   - `export_stock_in_csv`: Date, Product, Supplier, Quantity, Unit Price, Total Cost, User.
+   - `export_stock_out_csv`: Date, Product, Quantity, Total Value Recognized, Usage Notes, User.
+   - `export_expenses_csv`: Date, Category, Title, Amount, Reference, Logged By.
+
+All reporting endpoints are locked with `@admin_required`.
+
+EXACT FILE PATH:
+reports/views.py
+
+
+================================================================================
+SECTION 8: MULTI-CURRENCY FOREX LOCALIZATION & CONTEXT PROCESSORS
+================================================================================
+
+Q18. How does Dynamic Multi-Currency Forex conversion work without altering base data?
+--------------------------------------------------------------------------------
+ANSWER:
+Storing multiple currencies in database transaction rows causes massive reconciliation bugs 
+when exchange rates fluctuate. Invenpro solves this via Single-Base Storage with Presentation 
+Layer Conversion:
+1. Base Currency: All prices and transaction amounts in the database are stored exclusively in 
+   Indian Rupees (INR ₹).
+2. Configurable Rates: In `UserProfile`, admins configure rates relative to 1 unit of foreign currency:
+   - `usd_rate`: e.g. 84.00 (1 USD = 84 INR)
+   - `eur_rate`: e.g. 91.00 (1 EUR = 91 INR)
+   - `gbp_rate`: e.g. 107.00 (1 GBP = 107 INR)
+   - `aed_rate`: e.g. 23.00 (1 AED = 23 INR)
+3. Dynamic Conversion:
+   - To Foreign Currency: `convert_from_base(amount_in_inr) -> amount / rate`
+   - To Base INR: `convert_to_base(amount_in_foreign) -> amount * rate`
+4. Template Tag:
+   In HTML templates, numbers are rendered using `{% money product.purchase_price %}`, which 
+   reads the user's active currency, computes the conversion, and prefixes the currency symbol.
+
+EXACT FILE PATH:
+accounts/models.py & inventory/templatetags/currency_tags.py
+
+EXACT CODE:
+```python
+# accounts/models.py
+def convert_from_base(self, amount_in_inr):
+    if not amount_in_inr:
+        return Decimal('0.00')
+    cur = self.currency
+    if cur == 'USD':
+        return round(amount_in_inr / self.usd_rate, 2)
+    elif cur == 'EUR':
+        return round(amount_in_inr / self.eur_rate, 2)
+    elif cur == 'GBP':
+        return round(amount_in_inr / self.gbp_rate, 2)
+    elif cur == 'AED':
+        return round(amount_in_inr / self.aed_rate, 2)
+    return round(amount_in_inr, 2) # Base INR
+```
+
+--------------------------------------------------------------------------------
+Q19. How does the global stock alert context processor inject data into every template?
+--------------------------------------------------------------------------------
+ANSWER:
+Instead of querying alert counts in every single view function, `inventory/context_processors.py` 
+registers `stock_alert_context(request)`.
+On every HTTP request, it evaluates:
+- Active currency symbol and theme mode (Dark/Light).
+- Scoped tenant products.
+- Counts of depleted (`current_stock <= 0`) and low-stock (`current_stock <= minimum_stock`) items.
+- Injects `global_stock_alerts`, `currency_symbol`, `user_restaurant`, and `is_restaurant_admin` 
+  into the global template context automatically.
+
+EXACT FILE PATH:
+inventory/context_processors.py
+
+
+================================================================================
+SECTION 9: DEVELOPER IMPERSONATION & WORKSPACE LIFECYCLE
+================================================================================
+
+Q20. How does Developer Impersonation allow switching between restaurant workspaces?
+--------------------------------------------------------------------------------
+ANSWER:
+System Developers need the ability to inspect individual restaurant tenants without logging in 
+and out of different accounts.
+
+1. Mechanism:
+   - When a developer selects a restaurant from the header dropdown, `developer_switch_restaurant_view()` 
+     updates `request.session['developer_active_restaurant_id'] = restaurant_id`.
+   - Subsequent calls to `scope_queryset()` and `get_active_restaurant()` read this session key.
+2. Banner:
+   - Whenever an active tenant is selected, a blue glassmorphic banner appears:
+     `Developer Mode: Currently inspecting Tokki Restro (RES-85790). [Return to Admin Central]`
+3. Return:
+   - Clicking "Return to Admin Central" switches the session back to the global developer overview.
+
+EXACT FILE PATH:
+accounts/views.py & accounts/utils.py
+
+--------------------------------------------------------------------------------
+Q21. How does the backend automatically delete orphaned restaurants when the sole admin is deleted?
+--------------------------------------------------------------------------------
+ANSWER:
+If a developer deletes a Restaurant Admin, and that admin is the ONLY administrator for that 
+restaurant, keeping the restaurant in the database creates a ghost workspace with no owner.
+
+Invenpro uses Django Signals (`pre_delete` on `User` and `post_delete` on `UserProfile`):
+1. The signal intercepts deletion of an admin user.
+2. It queries remaining admins:
+   ```python
+   remaining_admins = UserProfile.objects.filter(
+       restaurant=rest, role='admin'
+   ).exclude(pk=instance.pk).count()
+   ```
+3. If `remaining_admins == 0`:
+   - It identifies all staff accounts belonging to that restaurant.
+   - It deletes `rest.delete()`, which cascades and deletes all associated catalog products, 
+     categories, suppliers, transactions, and expenses.
+   - It deletes all orphaned staff `User` accounts.
+4. If `remaining_admins > 0`, the restaurant persists safely for the other administrators.
+
+EXACT FILE PATH:
+accounts/models.py
+
+EXACT CODE:
+```python
+@receiver(pre_delete, sender=User)
+def auto_delete_restaurant_when_admin_deleted(sender, instance, **kwargs):
+    try:
+        profile = getattr(instance, 'profile', None)
+        if profile and profile.restaurant and profile.role == 'admin':
+            rest = profile.restaurant
+            remaining_admins = UserProfile.objects.filter(
+                restaurant=rest, 
+                role='admin'
+            ).exclude(user=instance).count()
+
+            if remaining_admins == 0:
+                staff_user_ids = list(
+                    User.objects.filter(profile__restaurant=rest)
+                    .exclude(pk=instance.pk)
+                    .exclude(is_superuser=True)
+                    .exclude(profile__role='developer')
+                    .values_list('id', flat=True)
+                )
+                rest.delete()
+                if staff_user_ids:
+                    User.objects.filter(id__in=staff_user_ids).delete()
+    except Exception:
+        pass
+```
+
+================================================================================
+                           END OF BACKEND MANUAL
+================================================================================

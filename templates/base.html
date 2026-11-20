@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   
   <!-- Custom StockWise CSS -->
-  <link rel="stylesheet" href="{% static 'css/stockwise.css' %}?v=4.1">
+  <link rel="stylesheet" href="{% static 'css/stockwise.css' %}?v=4.2">
   
   <script>
     // Immediate sidebar & guest theme restoration to avoid layout/theme flash
@@ -36,6 +36,9 @@
   {% block extra_css %}{% endblock %}
 </head>
 <body>
+
+  <!-- Master Ambient Background Layer (Watermark with Adaptive Low Opacity in Light & Dark Mode) -->
+  <div class="master-bg-layer" aria-hidden="true"></div>
 
 {% if user.is_authenticated %}
   <!-- Sidebar Navigation -->

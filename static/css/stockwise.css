@@ -25,6 +25,10 @@
   --border-color: #E2E6E3;
   --border-light: #ECEFEA;
   
+  /* Master Ambient Background */
+  --master-bg-opacity: 0.065;
+  --master-bg-filter: grayscale(18%) contrast(106%);
+  
   /* Status Colors */
   --success: #16A36A;
   --success-bg: #E7F7EF;
@@ -75,6 +79,10 @@
   --border-color: #263B31;
   --border-light: #1E332A;
 
+  /* Master Ambient Background */
+  --master-bg-opacity: 0.085;
+  --master-bg-filter: grayscale(12%) brightness(0.92) contrast(112%);
+
   --sidebar-bg: #081E17;
   --sidebar-hover: #122B22;
   --sidebar-active-bg: rgba(245, 196, 0, 0.18);
@@ -123,8 +131,34 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   margin: 0;
+  position: relative;
   transition: background-color 0.2s ease, color 0.2s ease;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Master Ambient Background Layer across Light & Dark modes */
+.master-bg-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('../images/master-bg.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  opacity: var(--master-bg-opacity, 0.065);
+  filter: var(--master-bg-filter, grayscale(18%));
+  transition: opacity 0.35s ease, filter 0.35s ease;
+  will-change: opacity, filter;
+}
+
+.app-main {
+  position: relative;
+  z-index: 1;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -1348,16 +1382,18 @@ body.sidebar-collapsed .app-sidebar .avatar-initials {
    Interactive Authentication Stage (Login, Staff Login, Register, OTP Recovery)
    ============================================================================== */
 .auth-stage {
-  background: radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.14), transparent 45%),
-              radial-gradient(circle at 85% 80%, rgba(245, 196, 0, 0.12), transparent 45%),
-              linear-gradient(145deg, #F3F8F5 0%, #EEF4F0 50%, #F7FAF8 100%);
+  position: relative;
+  z-index: 1;
+  background: radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.12), transparent 45%),
+              radial-gradient(circle at 85% 80%, rgba(245, 196, 0, 0.10), transparent 45%),
+              linear-gradient(145deg, rgba(243, 248, 245, 0.88) 0%, rgba(238, 244, 240, 0.92) 50%, rgba(247, 250, 248, 0.88) 100%);
   transition: background 0.35s ease;
 }
 
 [data-bs-theme="dark"] .auth-stage {
-  background: radial-gradient(circle at 18% 22%, rgba(16, 185, 129, 0.16), transparent 48%),
-              radial-gradient(circle at 82% 78%, rgba(196, 250, 3, 0.08), transparent 46%),
-              linear-gradient(145deg, #06110D 0%, #0A1B14 55%, #07140F 100%);
+  background: radial-gradient(circle at 18% 22%, rgba(16, 185, 129, 0.14), transparent 48%),
+              radial-gradient(circle at 82% 78%, rgba(196, 250, 3, 0.06), transparent 46%),
+              linear-gradient(145deg, rgba(6, 17, 13, 0.88) 0%, rgba(10, 27, 20, 0.92) 55%, rgba(7, 20, 15, 0.88) 100%);
 }
 
 /* Ambient Floating Orbs */
