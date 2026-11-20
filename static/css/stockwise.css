@@ -25,9 +25,9 @@
   --border-color: #E2E6E3;
   --border-light: #ECEFEA;
   
-  /* Master Ambient Background */
-  --master-bg-opacity: 0.065;
-  --master-bg-filter: grayscale(18%) contrast(106%);
+  /* Master Ambient Background */ 
+  --master-bg-opacity: 0.2;
+  --master-bg-filter: grayscale(18%) contrast(200%);
   
   /* Status Colors */
   --success: #16A36A;
@@ -80,8 +80,8 @@
   --border-light: #1E332A;
 
   /* Master Ambient Background */
-  --master-bg-opacity: 0.085;
-  --master-bg-filter: grayscale(12%) brightness(0.92) contrast(112%);
+  --master-bg-opacity: 0.1;
+  --master-bg-filter: grayscale(18%) brightness(1) contrast(112%);
 
   --sidebar-bg: #081E17;
   --sidebar-hover: #122B22;
@@ -150,7 +150,7 @@ body {
   background-position: center center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  opacity: var(--master-bg-opacity, 0.065);
+  opacity: var(--master-bg-opacity, 0.5);
   filter: var(--master-bg-filter, grayscale(18%));
   transition: opacity 0.35s ease, filter 0.35s ease;
   will-change: opacity, filter;
