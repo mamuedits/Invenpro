@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sign In – Invenpro{% endblock %}
+
+{% block auth_content %}
+<div class="container px-3">
+  <div class="auth-shell">
+    <div class="row g-0 align-items-stretch">
+      <!-- Unified Centered Brand Showcase Panel (Same for Admin/Dev & Staff) -->
+      {% include 'accounts/_auth_showcase.html' %}
+
+      <!-- Right Interactive Sign-In Panel -->
+      <div class="col-lg-7 auth-form-pane d-flex flex-column justify-content-center">
+        <!-- Mobile Logo Badge -->
+        <div class="text-center mb-3 d-lg-none">
+          <div class="auth-logo-badge">
+            <img src="{% static 'images/invenpro-logo.png' %}?v=3.2" alt="Invenpro Logo" style="max-height: 54px;">
+          </div>
+        </div>
+
+        <!-- Portal Role Switcher -->
+        <div class="auth-role-tabs mb-3">
+          <a href="{% url 'login' %}" class="auth-role-tab active">
+            <i class="bi bi-shield-check"></i> Admin / Developer
+          </a>
+          <a href="{% url 'staff_login' %}" class="auth-role-tab">
+            <i class="bi bi-person-badge"></i> Staff Portal
+          </a>
+        </div>
+
+        <div class="mb-3">
+          <h3 class="fw-bold mb-1">Sign in to Invenpro</h3>
+          <p class="text-secondary small mb-0">
+            Enter your Restaurant Admin or Developer credentials to open your dashboard.
+          </p>
+        </div>
+
+        <form method="POST" class="auth-form">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="id_username">Username</label>
+            <div class="input-group auth-input-group">
+              <span class="input-group-text border-end-0"><i class="bi bi-person"></i></span>
+              {{ form.username }}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label small fw-semibold mb-0" for="id_password">Password</label>
+              <a href="{% url 'forgot_password' %}" class="small fw-semibold text-primary text-decoration-none">
+                <i class="bi bi-key me-1"></i>Forgot Password?
+              </a>
+            </div>
+            <div class="input-group auth-input-group">
+              <span class="input-group-text border-end-0"><i class="bi bi-lock"></i></span>
+              {{ form.password }}
+              <button type="button" class="btn btn-outline-secondary border-start-0 btn-toggle-pwd-input"
+                data-target="id_password" title="Show / Hide Password" aria-label="Toggle password visibility"
+                style="border-color: var(--border-color);">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit"
+            class="btn btn-primary w-100 auth-submit-btn d-flex align-items-center justify-content-center gap-2 mt-2">
+            <i class="bi bi-box-arrow-in-right fs-5"></i>
+            <span>Sign In to Dashboard</span>
+          </button>
+        </form>
+
+        <!-- OTP Recovery Hint + New Restaurant Registration -->
+        <div
+          class="mt-3 pt-3 border-top d-flex flex-column flex-sm-row justify-content-center align-items-center gap-2 small">
+          <span class="text-secondary">
+            New restaurant owner?
+            <a href="{% url 'register' %}" class="fw-bold text-primary text-decoration-none ms-1">Register Workspace
+              &rarr;</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

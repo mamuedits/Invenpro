@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static currency_tags %}
+
+{% block title %}Operating Expenses – Invenpro{% endblock %}
+{% block page_title %}Expense Management{% endblock %}
+
+{% block content %}
+<!-- Financial Summary Cards (3 Clean StatCards) -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat-card-clean accent-info">
+      <div>
+        <div class="stat-card-label">
+          <span>Monthly Purchases</span>
+          <div class="stat-card-icon-wrap" style="color: var(--info);"><i class="bi bi-cart-check"></i></div>
+        </div>
+        <div class="stat-card-value text-primary">{% money this_month_purchases %}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-arrow-down-left me-1"></i>Stock-In purchase ledger</div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="stat-card-clean accent-danger">
+      <div>
+        <div class="stat-card-label">
+          <span>Operating Overheads</span>
+          <div class="stat-card-icon-wrap" style="color: var(--danger);"><i class="bi bi-receipt"></i></div>
+        </div>
+        <div class="stat-card-value text-danger">{% money this_month_expenses %}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-building me-1"></i>Rent, utilities, chef wages & overhead</div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="stat-card-clean accent-yellow">
+      <div>
+        <div class="stat-card-label">
+          <span>Total Monthly Cash Outflow</span>
+          <div class="stat-card-icon-wrap" style="color: var(--warning);"><i class="bi bi-wallet2"></i></div>
+        </div>
+        <div class="stat-card-value">{% money total_combined_month %}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-calculator me-1"></i>Combined monthly business outflow</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters & Actions -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body p-3">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+      <form method="GET" class="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+        <div class="input-group" style="max-width: 300px;">
+          <span class="input-group-text text-secondary border-end-0"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" value="{{ search }}" class="form-control border-start-0 ps-0" placeholder="Search title or notes...">
+        </div>
+
+        <select name="category" class="form-select" style="max-width: 250px;" onchange="this.form.submit()">
+          <option value="">All Expense Categories</option>
+          {% for code, label in category_choices %}
+            <option value="{{ code }}" {% if selected_category == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        {% if search or selected_category %}
+          <a href="{% url 'expense_list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+        {% endif %}
+      </form>
+
+      <div class="d-flex gap-2">
+        <a href="{% url 'export_expenses_csv' %}" data-no-pjax class="btn btn-outline-success btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+        </a>
+        <a href="{% url 'expense_create' %}" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-plus-circle"></i> Record Expense
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Expense Ledger Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-receipt text-primary me-2"></i>Operating Expenditure Ledger</h6>
+    <small class="text-secondary">{{ expenses.paginator.count|default:expenses|length }} entries recorded</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Title</th>
+            <th>Category</th>
+            <th>Amount</th>
+            <th>Description &amp; Remarks</th>
+            <th>Recorded By</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for exp in expenses %}
+            <tr>
+              <td class="text-nowrap"><span class="fw-semibold">{{ exp.expense_date|date:"M d, Y" }}</span></td>
+              <td class="fw-semibold">{{ exp.title }}</td>
+              <td>
+                <span class="badge-neutral">{{ exp.get_category_display }}</span>
+              </td>
+              <td class="fw-bold text-danger text-nowrap">{% money exp.amount %}</td>
+              <td class="text-secondary small">{{ exp.description|default:"—" }}</td>
+              <td><span class="badge-neutral">{{ exp.created_by.username }}</span></td>
+              <td class="text-end">
+                <a href="{% url 'expense_delete' exp.id %}" class="btn btn-sm btn-outline-danger py-1 px-2" title="Delete Expense">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center py-5 text-secondary">
+                <i class="bi bi-wallet-fill text-secondary fs-3 d-block mb-2"></i>
+                No operating expenses logged yet.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Permanent System-Wide Elided Pagination -->
+  {% include 'includes/pagination.html' with page_obj=expenses item_label='expenses' %}
+</div>
+{% endblock %}

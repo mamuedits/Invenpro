@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} – Invenpro{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-box-seam text-primary me-2"></i>{{ title }}</h5>
+        <a href="{% url 'product_list' %}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i> Back to Catalog
+        </a>
+      </div>
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+
+          {% if form.errors %}
+            <div class="alert alert-danger py-2 small mb-3">
+              Please fix the errors below.
+            </div>
+          {% endif %}
+
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="id_name">Product Name *</label>
+              {{ form.name }}
+              {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors.0 }}</div>{% endif %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="id_category">Category *</label>
+              {{ form.category }}
+              <div class="form-text">
+                Need a new category? <a href="{% url 'category_create' %}" target="_blank">Add Category</a>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="id_unit">Measurement Unit *</label>
+              {{ form.unit }}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="id_purchase_price">Default Purchase Price ({{ currency_symbol }} per unit) *</label>
+              <div class="input-group">
+                <span class="input-group-text">{{ currency_symbol }}</span>
+                {{ form.purchase_price }}
+              </div>
+              <div class="form-text">Used for inventory asset valuation and default cost calculation.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="id_minimum_stock">Minimum Stock Alert Threshold *</label>
+              {{ form.minimum_stock }}
+              <div class="form-text">Triggers a "Low Stock" warning when inventory falls to or below this level.</div>
+            </div>
+
+            {% if is_new %}
+              <div class="col-12">
+                <div class="p-3 surface-box">
+                  <label class="form-label fw-bold" for="id_initial_stock">
+                    <i class="bi bi-box-arrow-in-down text-primary me-1"></i> Opening Stock (Initial Quantity)
+                  </label>
+                  {{ form.initial_stock }}
+                  <div class="form-text">
+                    Optional. If provided, Invenpro will automatically record an initial Stock-In purchase transaction atomically.
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mt-4 pt-3 border-top text-end">
+            <a href="{% url 'product_list' %}" class="btn btn-outline-secondary me-2">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4 fw-semibold">
+              <i class="bi bi-check2-circle me-1"></i> Save Product
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

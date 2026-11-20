@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Suppliers – Invenpro{% endblock %}
+{% block page_title %}Vendor & Supplier Directory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h5 class="fw-bold mb-1">Supplier Directory</h5>
+    <small class="text-muted">Manage supplier contacts, phone, email and order delivery addresses.</small>
+  </div>
+  {% if is_restaurant_admin or is_developer %}
+    <a href="{% url 'supplier_create' %}" class="btn btn-primary d-inline-flex align-items-center gap-1">
+      <i class="bi bi-plus-circle"></i> Add Supplier
+    </a>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  {% for s in suppliers %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm border-0 h-100 card-lift">
+        <div class="card-body p-4 d-flex flex-column">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <h5 class="fw-bold mb-0">{{ s.name }}</h5>
+              <small class="text-muted"><i class="bi bi-clock-history me-1"></i>{{ s.tx_count }} order{{ s.tx_count|pluralize }} logged</small>
+            </div>
+            <div class="stat-icon blue" style="width: 38px; height: 38px; font-size: 1.1rem;">
+              <i class="bi bi-truck"></i>
+            </div>
+          </div>
+
+          <div class="small text-muted mb-3 flex-grow-1">
+            {% if s.phone %}
+              <div class="mb-1"><i class="bi bi-telephone me-2 text-primary"></i>{{ s.phone }}</div>
+            {% endif %}
+            {% if s.email %}
+              <div class="mb-1"><i class="bi bi-envelope me-2 text-primary"></i>{{ s.email }}</div>
+            {% endif %}
+            {% if s.address %}
+              <div><i class="bi bi-geo-alt me-2 text-primary"></i>{{ s.address }}</div>
+            {% endif %}
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
+            <a href="{% url 'stock_in' %}" class="btn btn-sm btn-outline-success">
+              <i class="bi bi-plus-circle me-1"></i> New Order
+            </a>
+            {% if is_restaurant_admin or is_developer %}
+              <div class="btn-group btn-group-sm">
+                <a href="{% url 'supplier_update' s.id %}" class="btn btn-outline-primary" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'supplier_delete' s.id %}" class="btn btn-outline-danger" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-12 text-center py-5 text-muted">
+      <i class="bi bi-truck fs-1 d-block mb-2"></i>
+      No suppliers added yet. Click "Add Supplier" to record your vendors.
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
+

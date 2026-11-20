@@ -1,0 +1,59 @@
+{% load static %}
+<div class="col-lg-5 auth-showcase d-none d-lg-flex">
+  <div class="position-relative w-100 d-flex flex-column align-items-center text-center my-auto" style="z-index: 2;">
+    <!-- Centered Brand Logo Badge -->
+    <div class="auth-logo-badge mb-3">
+      <img src="{% static 'images/invenpro-logo.png' %}?v=3.2" alt="Invenpro Logo">
+    </div>
+
+    <!-- Centered Dynamic Greeting Pill -->
+    <div class="d-inline-flex align-items-center justify-content-center gap-2 px-3 py-1 rounded-pill mb-3" style="background: rgba(196, 250, 3, 0.14); border: 1px solid rgba(196, 250, 3, 0.3); font-size: 0.74rem; color: #c4fa03; font-weight: 600;">
+      <span class="pulse-dot bg-success"></span>
+      <span id="authDynamicGreeting">Welcome to Invenpro</span>
+    </div>
+
+    <!-- Centered System Headline & Accurate Description -->
+    <h3 class="fw-bold text-white mb-2" style="letter-spacing: -0.025em; line-height: 1.2;">
+      Complete Restaurant Inventory &amp; Cost Control
+    </h3>
+    <p class="text-white-50 mb-3" style="font-size: 0.82rem; max-width: 315px; line-height: 1.5;">
+      One unified multi-tenant workspace for atomic stock tracking, predictive depletion alerts, operating expenses, and live analytics.
+    </p>
+
+    <!-- 3 Compact Centered System Highlights -->
+    <div class="d-flex flex-column gap-2 w-100 text-start">
+      <div class="auth-showcase-feature">
+        <div class="auth-showcase-icon"><i class="bi bi-boxes"></i></div>
+        <div>
+          <div class="fw-semibold text-white" style="font-size: 0.8rem;">Atomic Stock-In, Out &amp; Audits</div>
+          <div class="text-white-50" style="font-size: 0.71rem;">Zero negative-stock errors with full movement ledger</div>
+        </div>
+      </div>
+
+      <div class="auth-showcase-feature">
+        <div class="auth-showcase-icon"><i class="bi bi-bell-fill"></i></div>
+        <div>
+          <div class="fw-semibold text-white" style="font-size: 0.8rem;">Smart Burn-Rate &amp; Runway Alerts</div>
+          <div class="text-white-50" style="font-size: 0.71rem;">Live low-stock bell counts &amp; 7-day depletion forecasts</div>
+        </div>
+      </div>
+
+      <div class="auth-showcase-feature">
+        <div class="auth-showcase-icon"><i class="bi bi-bar-chart-line-fill"></i></div>
+        <div>
+          <div class="fw-semibold text-white" style="font-size: 0.8rem;">Multi-Tenant Expenses &amp; Reports</div>
+          <div class="text-white-50" style="font-size: 0.71rem;">Isolated Restaurant IDs, multi-currency &amp; CSV exports</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compact Centered Footer Line -->
+    <div class="mt-3 pt-2 border-top border-white border-opacity-10 w-100 d-flex justify-content-center align-items-center gap-3 text-white-50" style="font-size: 0.74rem;">
+      <span>Invenpro &copy; 2026</span>
+      <span>&bull;</span>
+      <a href="mailto:mamuedits@gmail.com" class="text-white-50 text-decoration-none">
+        <i class="bi bi-envelope me-1"></i>mamuedits@gmail.com
+      </a>
+    </div>
+  </div>
+</div>

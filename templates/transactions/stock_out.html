@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load static currency_tags %}
+
+{% block title %}Stock-Out (Usage) – Invenpro{% endblock %}
+{% block page_title %}Stock-Out (Consumption & Usage){% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Left Column: Form -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 fw-bold text-danger">
+            <i class="bi bi-arrow-up-right-circle-fill me-2"></i>Record Kitchen Consumption &amp; Stock-Out
+          </h5>
+          <small class="text-secondary">Atomically deducts inventory balances. Strict negative-stock prevention active.</small>
+        </div>
+        <a href="{% url 'transaction_list' %}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-journal-text me-1"></i> Movement Ledger
+        </a>
+      </div>
+      <div class="card-body p-4">
+        <form method="POST" id="stockOutForm">
+          {% csrf_token %}
+
+          {% if form.errors %}
+            <div class="alert alert-danger py-2 small mb-3">
+              Please correct the highlighted errors below.
+            </div>
+          {% endif %}
+
+          <div class="row g-3">
+            <!-- Product selection -->
+            <div class="col-12">
+              <label class="form-label" for="id_product_out">Product *</label>
+              {{ form.product }}
+            </div>
+
+            <!-- Quantity -->
+            <div class="col-12">
+              <label class="form-label" for="id_quantity">Quantity to Deduct *</label>
+              {{ form.quantity }}
+              <!-- Quick Kitchen Preset Buttons -->
+              <div class="d-flex flex-wrap align-items-center gap-1 mt-2">
+                <span class="text-secondary small me-1">Fast Presets:</span>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-quick-qty" data-qty="1">+1</button>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-quick-qty" data-qty="2">+2</button>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-quick-qty" data-qty="5">+5</button>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-quick-qty" data-qty="10">+10</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-quick-qty-reset">Clear</button>
+              </div>
+              <!-- Warning container -->
+              <div id="stock_out_warning" class="alert alert-danger py-2 mt-2 small d-none"></div>
+            </div>
+
+            <!-- Reason / Notes -->
+            <div class="col-12">
+              <label class="form-label" for="id_notes">Usage Reason / Station / Prep Order</label>
+              {{ form.notes }}
+              <div class="d-flex flex-wrap align-items-center gap-1 mt-2">
+                <span class="text-secondary small me-1">Kitchen Shortcuts:</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-quick-note" data-note="Daily kitchen cooking prep">🍳 Kitchen Prep</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-quick-note" data-note="Lunch / Dinner service rush">🍽️ Service Rush</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-quick-note" data-note="Recipe testing & tasting">👨‍🍳 Tasting / Sample</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-quick-note" data-note="Staff meal preparation">🍱 Staff Meal</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 btn-quick-note" data-note="Kitchen spillage / waste">🗑️ Waste</button>
+              </div>
+              <div class="form-text small mt-1">e.g. Lunch service preparation, Chef station issue, Banquet order, Spillage.</div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-top text-end">
+            <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary me-2">Cancel</a>
+            <button type="submit" id="submit_stock_out_btn" class="btn btn-danger px-4 fw-semibold">
+              <i class="bi bi-check2-circle me-1"></i> Confirm &amp; Deduct Stock
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Desktop Side Summary Card (Specification 4.6) -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 sticky-top" style="top: 85px;">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart text-danger me-2"></i>Stock-Out Impact</h6>
+        <small class="text-secondary">Projected balance & depletion check</small>
+      </div>
+      <div class="card-body">
+        <div class="mb-3 pb-3 border-bottom">
+          <small class="text-secondary text-uppercase fw-semibold d-block">Selected Item</small>
+          <div class="fw-bold fs-6 mt-1 text-truncate" id="summary_out_product_name">None selected</div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-secondary small">Available Inventory:</span>
+          <span class="fw-semibold" id="summary_out_available">0.00</span>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-danger small fw-semibold">&minus; Quantity to Deduct:</span>
+          <span class="fw-bold text-danger" id="summary_out_deduct">- 0.00</span>
+        </div>
+
+        <div class="p-3 my-3 rounded-3 border" style="background-color: var(--bg-secondary);">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small fw-bold text-uppercase">Projected Remaining:</span>
+            <span class="fs-4 fw-bold text-success" id="summary_out_remaining">0.00</span>
+          </div>
+        </div>
+
+        <div class="alert alert-warning border-0 mt-3 mb-0 py-2 small d-flex align-items-center gap-2">
+          <i class="bi bi-shield-lock text-warning fs-5"></i>
+          <div>Server-side negative-stock validation enforces zero negative balances.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{ products|json_script:"stockwise-products-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const dataEl = document.getElementById('stockwise-products-data');
+    if (dataEl) {
+      try {
+        window.STOCKWISE_PRODUCTS = JSON.parse(dataEl.textContent || '[]');
+      } catch (e) {
+        window.STOCKWISE_PRODUCTS = [];
+      }
+    }
+
+    // Quick Qty & Note Handlers
+    document.addEventListener('click', function(e) {
+      const btnQty = e.target.closest('.btn-quick-qty');
+      if (btnQty) {
+        const addVal = parseFloat(btnQty.dataset.qty || '0');
+        const qtyInput = document.getElementById('id_quantity');
+        if (qtyInput) {
+          const current = parseFloat(qtyInput.value) || 0;
+          qtyInput.value = (current + addVal).toFixed(2);
+          qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+
+      const btnReset = e.target.closest('.btn-quick-qty-reset');
+      if (btnReset) {
+        const qtyInput = document.getElementById('id_quantity');
+        if (qtyInput) {
+          qtyInput.value = '';
+          qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+
+      const btnNote = e.target.closest('.btn-quick-note');
+      if (btnNote) {
+        const noteText = btnNote.dataset.note || '';
+        const notesInput = document.getElementById('id_notes');
+        if (notesInput) {
+          notesInput.value = noteText;
+        }
+      }
+    });
+  })();
+</script>
+{% endblock %}

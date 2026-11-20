@@ -1,0 +1,11 @@
+# Environment secrets (Gmail App Password, Twilio/WhatsApp API keys)
+.env
+
+# Python / Django caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3-journal
+staticfiles/
+.venv/
+venv/

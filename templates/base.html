@@ -1,0 +1,378 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="{{ theme_mode|default:'light' }}" data-guest-auth="{% if not user.is_authenticated %}true{% else %}false{% endif %}" data-currency="{{ currency_symbol|default:'₹' }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Invenpro – Inventory Management System{% endblock %}</title>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
+  <!-- Custom StockWise CSS -->
+  <link rel="stylesheet" href="{% static 'css/stockwise.css' %}?v=4.1">
+  
+  <script>
+    // Immediate sidebar & guest theme restoration to avoid layout/theme flash
+    if (localStorage.getItem('invenpro_sidebar_collapsed') === 'true') {
+      document.documentElement.classList.add('sidebar-collapsed');
+    }
+    if (document.documentElement.dataset.guestAuth === 'true') {
+      var savedGuestTheme = localStorage.getItem('invenpro_guest_theme');
+      if (savedGuestTheme === 'dark' || savedGuestTheme === 'light') {
+        document.documentElement.setAttribute('data-bs-theme', savedGuestTheme);
+      }
+    }
+  </script>
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if user.is_authenticated %}
+  <!-- Sidebar Navigation -->
+  <aside class="app-sidebar">
+    <div class="sidebar-brand">
+      <div id="sidebarLogoToggle" class="brand-logo-wrap" title="Toggle Sidebar (Expand / Shrink)" role="button" tabindex="0">
+        <img src="{% static 'images/invenpro-logo.png' %}?v=3.2" alt="Invenpro Logo" class="brand-logo-img">
+      </div>
+      <div class="brand-text-wrap">
+        <a href="{% url 'dashboard' %}" class="text-decoration-none">
+          <span class="d-block lh-1 text-white fw-bold fs-5 tracking-tight">Inven<span style="color: #c4fa03;">pro</span></span>
+          <small class="text-white-50 fw-semibold" style="font-size: 0.65rem; letter-spacing: 0.8px; text-transform: uppercase;">Inventory System</small>
+        </a>
+      </div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-section-title">Core Overview</div>
+      <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" title="Dashboard">
+        <i class="bi bi-grid-1x2-fill"></i>
+        <span>Dashboard</span>
+      </a>
+
+      <a href="{% url 'smart_alerts' %}" class="nav-link {% if request.resolver_match.url_name == 'smart_alerts' %}active{% endif %}" title="Smart Stock Alerts">
+        <i class="bi bi-bell-fill"></i>
+        <span>Smart Stock Alerts</span>
+        {% if global_stock_alerts and enable_stock_alerts %}
+          <span class="badge bg-danger rounded-pill ms-auto" style="font-size: 0.72rem;">{{ global_stock_alerts }}</span>
+        {% endif %}
+      </a>
+
+      {% if is_developer %}
+        <a href="{% url 'admin_management' %}" class="nav-link {% if 'admin_management' in request.resolver_match.url_name %}active{% endif %}" title="Admin Management">
+          <i class="bi bi-shield-lock-fill"></i>
+          <span>Admin Management</span>
+        </a>
+      {% elif is_restaurant_admin %}
+        <a href="{% url 'staff_management' %}" class="nav-link {% if 'staff' in request.resolver_match.url_name %}active{% endif %}" title="Staff Management">
+          <i class="bi bi-people-fill"></i>
+          <span>Staff Management</span>
+        </a>
+      {% endif %}
+
+      {% if is_restaurant_admin or is_developer %}
+        <a href="{% url 'settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" title="Settings & Theme">
+          <i class="bi bi-gear-fill"></i>
+          <span>Settings &amp; Store Setup</span>
+        </a>
+      {% endif %}
+
+      <div class="nav-section-title mt-2">Inventory Control</div>
+      <a href="{% url 'product_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}" title="Products & Stock">
+        <i class="bi bi-boxes"></i>
+        <span>Products &amp; Stock</span>
+      </a>
+      <a href="{% url 'category_list' %}" class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}" title="Categories">
+        <i class="bi bi-tags-fill"></i>
+        <span>Categories</span>
+      </a>
+      <a href="{% url 'supplier_list' %}" class="nav-link {% if 'supplier' in request.resolver_match.url_name %}active{% endif %}" title="Suppliers">
+        <i class="bi bi-truck"></i>
+        <span>Suppliers</span>
+      </a>
+
+      <div class="nav-section-title mt-2">Transactions</div>
+      <a href="{% url 'stock_in' %}" class="nav-link {% if request.resolver_match.url_name == 'stock_in' %}active{% endif %}" title="Stock-In (Purchase)">
+        <i class="bi bi-arrow-down-left-circle-fill"></i>
+        <span>Stock-In (Purchase)</span>
+      </a>
+      <a href="{% url 'stock_out' %}" class="nav-link {% if request.resolver_match.url_name == 'stock_out' %}active{% endif %}" title="Stock-Out (Usage)">
+        <i class="bi bi-arrow-up-right-circle-fill"></i>
+        <span>Stock-Out (Usage)</span>
+      </a>
+      {% if is_restaurant_admin or is_developer %}
+        <a href="{% url 'stock_adjustment' %}" class="nav-link {% if request.resolver_match.url_name == 'stock_adjustment' %}active{% endif %}" title="Audit Adjustment">
+          <i class="bi bi-sliders"></i>
+          <span>Audit Adjustment</span>
+        </a>
+      {% endif %}
+      <a href="{% url 'transaction_list' %}" class="nav-link {% if request.resolver_match.url_name == 'transaction_list' %}active{% endif %}" title="Movement History">
+        <i class="bi bi-clock-history"></i>
+        <span>Movement History</span>
+      </a>
+
+      {% if is_restaurant_admin or is_developer %}
+        <div class="nav-section-title mt-2">Financials &amp; Analytics</div>
+        <a href="{% url 'expense_list' %}" class="nav-link {% if 'expense' in request.resolver_match.url_name %}active{% endif %}" title="Operating Expenses">
+          <i class="bi bi-wallet2"></i>
+          <span>Operating Expenses</span>
+        </a>
+        <a href="{% url 'report_overview' %}" class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}" title="Reports & Analytics">
+          <i class="bi bi-bar-chart-line-fill"></i>
+          <span>Reports &amp; Analytics</span>
+        </a>
+      {% endif %}
+
+      <div class="nav-section-title mt-2">Account</div>
+      <a href="{% url 'profile' %}" class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}" title="My Profile">
+        <i class="bi bi-person-circle"></i>
+        <span>My Profile</span>
+      </a>
+      {% if is_developer %}
+        <a href="/admin/" target="_blank" class="nav-link" title="Django SuperAdmin">
+          <i class="bi bi-shield-shaded"></i>
+          <span>Django Admin</span>
+          <i class="bi bi-box-arrow-up-right ms-auto sidebar-link-ext text-muted" style="font-size: 0.72rem;"></i>
+        </a>
+      {% endif %}
+    </div>
+    <script>
+      (function() {
+        try {
+          var nav = document.querySelector('.sidebar-nav');
+          var pos = sessionStorage.getItem('invenpro_sidebar_scroll');
+          if (nav && pos !== null) {
+            nav.scrollTop = parseInt(pos, 10);
+          }
+        } catch(e) {}
+      })();
+    </script>
+
+    <div class="sidebar-footer">
+      <div class="d-flex align-items-center justify-content-between w-100">
+        <div class="d-flex align-items-center gap-2">
+          <div class="avatar-initials" title="{{ user.username }}">
+            {{ user.username|first|upper }}
+          </div>
+          <div class="user-info-wrap overflow-hidden" style="max-width: 120px;">
+            <div class="text-truncate fw-semibold text-white small">{{ user.username }}</div>
+            <div class="text-truncate text-muted" style="font-size: 0.75rem;">
+              {% if is_developer %}
+                <span class="badge bg-warning text-dark py-0 px-1" style="font-size: 0.65rem;">Developer</span>
+              {% elif is_restaurant_admin %}
+                <span class="badge bg-primary py-0 px-1" style="font-size: 0.65rem;">Restaurant Admin</span>
+              {% else %}
+                <span class="badge bg-secondary py-0 px-1" style="font-size: 0.65rem;">Staff Member</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="sidebar-footer-actions d-flex align-items-center gap-1">
+          <!-- Quick Theme Toggle -->
+          <a href="{% url 'toggle_theme_quick' %}" class="btn btn-sm btn-outline-secondary text-light p-1 px-2" title="Toggle Light/Dark Theme">
+            {% if theme_mode == 'dark' %}
+              <i class="bi bi-sun-fill"></i>
+            {% else %}
+              <i class="bi bi-moon-stars-fill"></i>
+            {% endif %}
+          </a>
+          <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-secondary text-light p-1 px-2" title="Logout">
+            <i class="bi bi-box-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="app-main">
+    <!-- Top Header -->
+    <header class="app-header d-flex align-items-center justify-content-between">
+      <!-- Left side: ONLY Restaurant Name -->
+      <div class="d-flex align-items-center gap-2">
+        <!-- Hidden container to retain page title block for test compatibility -->
+        <span class="visually-hidden">{% block page_title %}Operational Dashboard{% endblock %}</span>
+
+        {% if is_developer %}
+          <!-- Developer Clean Restaurant Switcher Dropdown (Restaurant Name only) -->
+          <div class="dropdown">
+            <button class="btn btn-sm dropdown-toggle header-restaurant-dropdown d-inline-flex align-items-center gap-2 px-3 py-1 shadow-none" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-shop text-primary"></i>
+              <span class="header-restaurant-title text-truncate" style="max-width: 260px;">{{ user_restaurant.name|default:"Select Restaurant" }}</span>
+            </button>
+            <ul class="dropdown-menu shadow-sm border py-1" style="min-width: 260px; max-height: 380px; overflow-y: auto; border-radius: 12px;">
+              {% for rest in all_restaurants %}
+                <li>
+                  <a class="dropdown-item d-flex align-items-center justify-content-between py-2 px-3 {% if user_restaurant and user_restaurant.id == rest.id %}active bg-primary text-white fw-bold{% endif %}" href="{% url 'developer_switch_restaurant' restaurant_id=rest.restaurant_id %}">
+                    <span class="text-truncate me-2">{{ rest.name }}</span>
+                    <span class="badge {% if user_restaurant and user_restaurant.id == rest.id %}bg-white text-primary{% else %}bg-secondary-subtle text-secondary border{% endif %} font-monospace" style="font-size: 0.72rem;">{{ rest.restaurant_id }}</span>
+                  </a>
+                </li>
+              {% empty %}
+                <li><span class="dropdown-item text-muted small py-2">No restaurants registered</span></li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% elif user_restaurant %}
+          <!-- Restaurant Accounts (Admin / Staff): Their own restaurant name ONLY, no dropdown -->
+          <div class="header-restaurant-static d-inline-flex align-items-center gap-2 ps-1">
+            <i class="bi bi-shop text-primary fs-5"></i>
+            <span class="header-restaurant-title">{{ user_restaurant.name }}</span>
+          </div>
+        {% else %}
+          <div class="header-restaurant-static d-inline-flex align-items-center gap-2 ps-1">
+            <i class="bi bi-shop text-primary fs-5"></i>
+            <span class="header-restaurant-title">{{ user.profile.business_name|default:"Invenpro Store" }}</span>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Right side: Restaurant ID + Low Stock Alert Bell + Borderless Theme Toggle -->
+      <div class="d-flex align-items-center gap-3">
+        {% if user_restaurant %}
+          <!-- Restaurant ID displayed on the right -->
+          <div class="header-restaurant-id-badge d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill" title="System Allotted Restaurant ID">
+            <span class="text-muted small fw-normal">ID:</span>
+            <span class="text-primary font-monospace fw-bold">{{ user_restaurant.restaurant_id }}</span>
+          </div>
+        {% endif %}
+
+        <!-- Low Stock Items Bell Icon with Red Bubble -->
+        <a href="{% url 'smart_alerts' %}" class="header-bell-btn position-relative" title="Smart Stock Alerts: {{ global_stock_alerts|default:'0' }} low/depleted item{{ global_stock_alerts|pluralize }}">
+          <i class="bi bi-bell-fill fs-5"></i>
+          {% if global_stock_alerts and global_stock_alerts > 0 %}
+            <span class="header-bell-badge">
+              {{ global_stock_alerts }}
+              <span class="visually-hidden">low stock items</span>
+            </span>
+          {% endif %}
+        </a>
+
+        <!-- Quick Theme Toggle in Navbar (Borderless Icon Only) -->
+        <a href="{% url 'toggle_theme_quick' %}" class="header-theme-toggle" title="Toggle Light/Dark Theme">
+          {% if theme_mode == 'dark' %}
+            <i class="bi bi-sun-fill text-warning fs-5"></i>
+          {% else %}
+            <i class="bi bi-moon-stars-fill text-primary fs-5"></i>
+          {% endif %}
+        </a>
+      </div>
+    </header>
+
+    <!-- App Content Wrapper -->
+    <main class="app-content">
+      <!-- Django Alert Messages -->
+      {% if messages %}
+        <div class="messages-container mb-3">
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm d-flex align-items-center justify-content-between" role="alert">
+              <div>
+                {% if message.tags == 'success' %}
+                  <i class="bi bi-check-circle-fill me-2"></i>
+                {% elif message.tags == 'danger' or message.tags == 'error' %}
+                  <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                {% elif message.tags == 'warning' %}
+                  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                {% else %}
+                  <i class="bi bi-info-circle-fill me-2"></i>
+                {% endif %}
+                <span>{{ message }}</span>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if is_developer and user_restaurant and 'admin_management' not in request.resolver_match.url_name %}
+        <div class="alert alert-info py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between rounded-3 border-info-subtle shadow-sm">
+          <div class="d-flex align-items-center gap-2 small">
+            <i class="bi bi-shield-check text-info fs-5"></i>
+            <span><strong>Developer Mode:</strong> Currently inspecting <strong>{{ user_restaurant.name }}</strong> (<code>{{ user_restaurant.restaurant_id }}</code>).</span>
+          </div>
+          <a href="{% url 'admin_management' %}" class="btn btn-sm btn-outline-info text-decoration-none py-0 px-2 fw-semibold">Return to Admin Central &rarr;</a>
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- App Footer -->
+    <footer class="app-footer">
+      <div>
+        <strong>Invenpro</strong> &copy; 2026 – Inventory Management System
+      </div>
+      <div>
+        <a href="mailto:mamuedits@gmail.com" class="footer-mail-link text-decoration-none d-inline-flex align-items-center gap-2" title="Contact Developer">
+          <i class="bi bi-envelope-fill text-primary"></i>
+          <span>mamuedits@gmail.com</span>
+        </a>
+      </div>
+    </footer>
+  </div>
+
+{% else %}
+  <!-- Unauthenticated Interactive Auth Stage (Login / Staff Login / Register / Forgot Password) -->
+  <div class="auth-stage min-vh-100 d-flex flex-column justify-content-center position-relative overflow-hidden py-4">
+    <!-- Subtle Pleasant Ambient Orbs & Interactive Glow -->
+    <div class="auth-orb auth-orb-1" aria-hidden="true"></div>
+    <div class="auth-orb auth-orb-2" aria-hidden="true"></div>
+    <div class="auth-orb auth-orb-3" aria-hidden="true"></div>
+    <div class="auth-cursor-glow" id="authCursorGlow" aria-hidden="true"></div>
+
+    <!-- Floating Light / Dark Theme Toggle Switch on Auth Pages -->
+    <div class="auth-theme-bar">
+      <button
+        type="button"
+        id="guestThemeToggleBtn"
+        class="auth-theme-switch"
+        data-toggle-url="{% url 'toggle_guest_theme' %}"
+        title="Switch Light / Dark Theme"
+        aria-label="Toggle Light and Dark Theme"
+      >
+        <span class="theme-switch-track">
+          <i class="bi bi-sun-fill theme-icon-sun"></i>
+          <i class="bi bi-moon-stars-fill theme-icon-moon"></i>
+          <span class="theme-switch-thumb"></span>
+        </span>
+        <span class="theme-switch-label small fw-semibold d-none d-sm-inline" id="guestThemeLabel">Theme</span>
+      </button>
+    </div>
+
+    <div class="position-relative" style="z-index: 2;">
+      {% if messages %}
+        <div class="container mb-3" style="max-width: 960px;">
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm border-0 rounded-3 d-flex align-items-center justify-content-between" role="alert">
+              <div class="small fw-medium">{{ message }}</div>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% block auth_content %}{% endblock %}
+    </div>
+  </div>
+{% endif %}
+
+  <!-- Bootstrap 5.3 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Chart.js 4.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Custom StockWise / Invenpro JS -->
+  <script>
+    window.INVENPRO_CURRENCY = window.STOCKWISE_CURRENCY = document.documentElement.dataset.currency || '₹';
+  </script>
+  <script src="{% static 'js/stockwise.js' %}?v=4.0"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

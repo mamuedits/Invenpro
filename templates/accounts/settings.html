@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings – Invenpro{% endblock %}
+{% block page_title %}System & Business Settings{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>System & Business Settings</h5>
+          <small class="text-muted">Customize display theme, currency conversion rates, store branding, and alert preferences.</small>
+        </div>
+        <a href="{% url 'toggle_theme_quick' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+          {% if theme_mode == 'dark' %}
+            <i class="bi bi-sun-fill text-warning"></i> Switch to Light
+          {% else %}
+            <i class="bi bi-moon-stars-fill text-primary"></i> Switch to Dark
+          {% endif %}
+        </a>
+      </div>
+
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+
+          <!-- Section 1: Appearance & Regional Format -->
+          <div class="mb-4">
+            <h6 class="fw-bold text-uppercase small text-primary mb-3">
+              <i class="bi bi-palette-fill me-1"></i> Appearance & Regional Localization
+            </h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold" for="theme_mode_select">Theme Mode</label>
+                {{ form.theme_mode }}
+                <div class="form-text">Choose between bright daylight styling or sleek night dark mode.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_currency">Active Display Currency</label>
+                {{ form.currency }}
+                <div class="form-text">All financial totals and item costs will be automatically converted to <strong>{{ currency_symbol }}</strong>.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1.5: Currency Exchange Rates -->
+          <div class="mb-4 p-3 rounded-3 border" style="background-color: var(--bg-secondary);">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h6 class="fw-bold mb-0">
+                <i class="bi bi-currency-exchange text-success me-1"></i> Currency Conversion Rates (Base: 1 Foreign Unit in ₹ INR)
+              </h6>
+              <span class="badge bg-primary">Dynamic Conversion Active</span>
+            </div>
+            <p class="text-muted small mb-3">
+              Invenpro stores base amounts in Indian Rupees (₹). When you change the display currency, all product prices, stock values, and dashboard totals are converted on the fly using these exchange rates.
+            </p>
+            <div class="row g-3">
+              <div class="col-sm-6 col-md-3">
+                <label class="form-label small fw-semibold" for="id_usd_rate">1 USD ($) = ₹ INR</label>
+                {{ form.usd_rate }}
+              </div>
+              <div class="col-sm-6 col-md-3">
+                <label class="form-label small fw-semibold" for="id_eur_rate">1 EUR (€) = ₹ INR</label>
+                {{ form.eur_rate }}
+              </div>
+              <div class="col-sm-6 col-md-3">
+                <label class="form-label small fw-semibold" for="id_gbp_rate">1 GBP (£) = ₹ INR</label>
+                {{ form.gbp_rate }}
+              </div>
+              <div class="col-sm-6 col-md-3">
+                <label class="form-label small fw-semibold" for="id_aed_rate">1 AED (د.إ) = ₹ INR</label>
+                {{ form.aed_rate }}
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <!-- Section 2: Store & Business Branding -->
+          <div class="mb-4">
+            <h6 class="fw-bold text-uppercase small text-primary mb-3">
+              <i class="bi bi-shop me-1"></i> Store & Business Profile
+            </h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_business_name">Store / Business Name</label>
+                {{ form.business_name }}
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_phone">Official Contact Phone</label>
+                {{ form.phone }}
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_gst_number">GSTIN / Business Tax Identification</label>
+                {{ form.gst_number }}
+                <div class="form-text">Used on printed invoices and downloadable financial ledgers.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold" for="id_default_min_stock">Default Minimum Stock Alert Threshold</label>
+                {{ form.default_min_stock }}
+                <div class="form-text">Auto-assigned when adding new items without an explicit threshold.</div>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label fw-semibold" for="id_store_address">Business / Warehouse Address</label>
+                {{ form.store_address }}
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <!-- Section 3: Alert & Notification Preferences -->
+          <div class="mb-4">
+            <h6 class="fw-bold text-uppercase small text-primary mb-3">
+              <i class="bi bi-bell-fill me-1"></i> Notification & Alert Preferences
+            </h6>
+            <div class="form-check form-switch">
+              {{ form.enable_stock_alerts }}
+              <label class="form-check-label fw-semibold ms-2" for="id_enable_stock_alerts">
+                Enable Real-Time Low-Stock & Depletion Banners
+              </label>
+              <div class="form-text ms-2">Displays high-visibility warnings when products approach their minimum burn-rate threshold.</div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-top d-flex justify-content-between align-items-center">
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+            <button type="submit" class="btn btn-primary px-4 fw-semibold">
+              <i class="bi bi-check2-circle me-1"></i> Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Adjustment – Invenpro{% endblock %}
+{% block page_title %}Physical Audit Stock Adjustment{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0 fw-bold text-warning">
+            <i class="bi bi-sliders me-2"></i>Physical Inventory Audit Adjustment
+          </h5>
+          <small class="text-muted">Reconcile physical stock counts with digital records (Admin Only)</small>
+        </div>
+        <a href="{% url 'transaction_list' %}" class="btn btn-sm btn-outline-secondary">Back to Ledger</a>
+      </div>
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+
+          {% if form.errors %}
+            <div class="alert alert-danger py-2 small mb-3">
+              Please fix the errors indicated below.
+            </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label" for="id_product_adj">Product to Adjust *</label>
+            {{ form.product }}
+            <div id="adj_current_display" class="mt-1 small text-muted"></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="id_target_quantity">Actual Physical Counted Stock *</label>
+            {{ form.target_quantity }}
+            <div class="form-text">Enter the new exact quantity found during physical count.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="id_adj_reason">Audit Discrepancy Reason *</label>
+            {{ form.reason }}
+            <div class="form-text">Select the verified reason for this inventory correction.</div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold" for="id_notes">Audit Explanation / Justification *</label>
+            {{ form.notes }}
+            <div class="form-text">Detailed explanation is required for audit trail compliance.</div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+            <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-warning px-4 fw-semibold text-dark">
+              <i class="bi bi-check2 me-1"></i> Apply Adjustment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{{ products|json_script:"stockwise-products-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function initStockAdj() {
+    const dataEl = document.getElementById('stockwise-products-data');
+    if (dataEl) {
+      try {
+        window.STOCKWISE_PRODUCTS = JSON.parse(dataEl.textContent || '[]');
+      } catch (e) {
+        window.STOCKWISE_PRODUCTS = [];
+      }
+    }
+
+    const sel = document.getElementById('id_product_adj');
+    const disp = document.getElementById('adj_current_display');
+    const targetInput = document.getElementById('id_target_quantity');
+
+    function updateAdjInfo() {
+      if (!sel || !disp) return;
+      const pid = parseInt(sel.value, 10);
+      const prod = window.STOCKWISE_PRODUCTS ? window.STOCKWISE_PRODUCTS.find(p => p.id === pid) : null;
+      if (prod) {
+        disp.innerHTML = 'Current digital record: <strong>' + prod.current_stock + ' ' + prod.unit + '</strong>';
+        if (targetInput && !targetInput.value) {
+          targetInput.value = prod.current_stock;
+        }
+      }
+    }
+
+    if (sel) {
+      sel.addEventListener('change', updateAdjInfo);
+      if (sel.value) updateAdjInfo();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initStockAdj);
+  } else {
+    initStockAdj();
+  }
+</script>
+{% endblock %}
+

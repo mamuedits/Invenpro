@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile & Settings – Invenpro{% endblock %}
+{% block page_title %}Account Profile & Settings{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i>User Profile & Role</h5>
+        <span class="badge {% if profile.is_admin %}bg-primary{% else %}bg-secondary{% endif %} px-3 py-2">
+          {{ profile.get_role_display }}
+        </span>
+      </div>
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+          <div class="avatar-initials" style="width: 56px; height: 56px; font-size: 1.5rem;">
+            {{ user.username|first|upper }}
+          </div>
+          <div>
+            <h5 class="mb-1 fw-bold">{{ user.get_full_name|default:user.username }}</h5>
+            <div class="text-muted small">Username: <strong>{{ user.username }}</strong> &bull; Member since {{ user.date_joined|date:"M d, Y" }}</div>
+          </div>
+        </div>
+
+        <form method="POST">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">First Name</label>
+              {{ form.first_name }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Last Name</label>
+              {{ form.last_name }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email Address</label>
+              {{ form.email }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone</label>
+              {{ form.phone }}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Business / Store Name</label>
+              {{ form.business_name }}
+              <div class="form-text">This name appears on all dashboard headers and generated reports.</div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-top text-end">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check2 me-1"></i> Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

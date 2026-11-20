@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports & Analytics – Invenpro{% endblock %}
+{% block page_title %}Reports & Business Analytics{% endblock %}
+
+{% block content %}
+<!-- Filter Controls Bar -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body p-3">
+    <form method="GET" id="reportFilterForm" class="row g-2 align-items-center">
+      <div class="col-sm-6 col-md-3">
+        <label class="form-label small text-secondary mb-1">Date Preset</label>
+        {{ form.preset }}
+      </div>
+      
+      <div class="col-sm-6 col-md-2" id="startDateCol">
+        <label class="form-label small text-secondary mb-1">From Date</label>
+        {{ form.start_date }}
+      </div>
+      
+      <div class="col-sm-6 col-md-2" id="endDateCol">
+        <label class="form-label small text-secondary mb-1">To Date</label>
+        {{ form.end_date }}
+      </div>
+
+      <div class="col-sm-6 col-md-2">
+        <label class="form-label small text-secondary mb-1">Category</label>
+        {{ form.category }}
+      </div>
+
+      <div class="col-sm-6 col-md-2">
+        <label class="form-label small text-secondary mb-1">Product</label>
+        {{ form.product }}
+      </div>
+
+      <div class="col-sm-6 col-md-1 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100" style="margin-top: 22px;">
+          <i class="bi bi-filter"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Current Report Window Notification & Export Dropdown -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
+  <div>
+    <h5 class="fw-bold mb-0">
+      <i class="bi bi-calendar3 text-primary me-2"></i>Analysis Period: {{ start_date|date:"M d, Y" }} &ndash; {{ end_date|date:"M d, Y" }}
+    </h5>
+    <small class="text-secondary">Showing all stock transactions and operating expenses within this range.</small>
+  </div>
+  <div class="dropdown">
+    <button class="btn btn-outline-success dropdown-toggle d-inline-flex align-items-center gap-1 shadow-sm" type="button" data-bs-toggle="dropdown">
+      <i class="bi bi-cloud-arrow-down"></i> Export CSV Reports
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow-sm border">
+      <li><h6 class="dropdown-header">Export Data Files</h6></li>
+      <li>
+        <a class="dropdown-item" data-no-pjax href="{% url 'export_stock_in_csv' %}?preset={{ preset }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">
+          <i class="bi bi-file-earmark-arrow-down me-2 text-primary"></i>Stock-In (Purchases) CSV
+        </a>
+      </li>
+      <li>
+        <a class="dropdown-item" data-no-pjax href="{% url 'export_stock_out_csv' %}?preset={{ preset }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">
+          <i class="bi bi-file-earmark-arrow-down me-2 text-danger"></i>Stock-Out (Usage) CSV
+        </a>
+      </li>
+      <li>
+        <a class="dropdown-item" data-no-pjax href="{% url 'export_expenses_csv' %}?preset={{ preset }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">
+          <i class="bi bi-file-earmark-arrow-down me-2 text-warning"></i>Operating Expenses CSV
+        </a>
+      </li>
+      <li><hr class="dropdown-divider"></li>
+      <li>
+        <a class="dropdown-item" data-no-pjax href="{% url 'export_inventory_valuation_csv' %}">
+          <i class="bi bi-file-earmark-spreadsheet me-2 text-success"></i>Current Inventory Valuation CSV
+        </a>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- Financial Summary Grid (4 Clean StatCards) -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card-clean accent-info">
+      <div>
+        <div class="stat-card-label">
+          <span>Purchases Inflow</span>
+          <div class="stat-card-icon-wrap" style="color: var(--info);"><i class="bi bi-box-arrow-in-down"></i></div>
+        </div>
+        <div class="stat-card-value text-primary">{{ currency_symbol }}{{ total_in_amount|floatformat:2 }}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-tag me-1 text-primary"></i>{{ total_in_quantity }} units in {{ total_in_count }} transactions</div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card-clean accent-danger">
+      <div>
+        <div class="stat-card-label">
+          <span>Kitchen Usage Value</span>
+          <div class="stat-card-icon-wrap" style="color: var(--danger);"><i class="bi bi-box-arrow-up"></i></div>
+        </div>
+        <div class="stat-card-value text-danger">{{ currency_symbol }}{{ total_out_valuation|floatformat:2 }}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-dash-circle me-1 text-danger"></i>{{ total_out_quantity }} units consumed</div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card-clean accent-yellow">
+      <div>
+        <div class="stat-card-label">
+          <span>Operating Overhead</span>
+          <div class="stat-card-icon-wrap" style="color: var(--warning);"><i class="bi bi-receipt"></i></div>
+        </div>
+        <div class="stat-card-value">{{ currency_symbol }}{{ total_operational_expenses|floatformat:2 }}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-building me-1 text-warning"></i>Bills, Rent, Utilities, Wages</div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card-clean accent-green">
+      <div>
+        <div class="stat-card-label">
+          <span>Total Cash Outflow</span>
+          <div class="stat-card-icon-wrap" style="color: var(--success);"><i class="bi bi-wallet2"></i></div>
+        </div>
+        <div class="stat-card-value text-success">{{ currency_symbol }}{{ total_business_cash_outflow|floatformat:2 }}</div>
+      </div>
+      <div class="stat-card-subtext"><i class="bi bi-calculator me-1 text-success"></i>Purchases + Operating Expenses</div>
+    </div>
+  </div>
+</div>
+
+<!-- Visual Charts Section -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill text-danger me-2"></i>Top Consumed Products by Value ({{ currency_symbol }})</h6>
+        <small class="text-secondary">Stock-Out cost valuation in selected date period</small>
+      </div>
+      <div class="card-body">
+        <div style="height: 260px;">
+          <canvas
+            id="topConsumedChart"
+            data-currency="{{ currency_symbol|default:'₹' }}"
+            data-labels="{{ chart_top_labels_json|escape }}"
+            data-values="{{ chart_top_values_json|escape }}"
+          ></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Expense Breakdown by Category</h6>
+        <small class="text-secondary">Operational expenses recorded in selected period</small>
+      </div>
+      <div class="card-body d-flex flex-column align-items-center justify-content-center">
+        <div style="height: 240px; width: 100%;">
+          <canvas
+            id="expenseCategoryChart"
+            data-currency="{{ currency_symbol|default:'₹' }}"
+            data-labels="{{ exp_labels_json|escape }}"
+            data-values="{{ exp_values_json|escape }}"
+          ></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Product-Wise Usage & Inventory Valuation Matrix -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h6 class="mb-0 fw-bold"><i class="bi bi-table text-primary me-2"></i>Product-Wise Movement &amp; Valuation Matrix</h6>
+      <small class="text-secondary">Breakdown of purchases, usage, current stock and valuation</small>
+    </div>
+    <div class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
+      Total On-Hand Asset Value: <strong>{{ currency_symbol }}{{ current_inventory_valuation|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Purchased (In)</th>
+            <th>Purchase Spend ({{ currency_symbol }})</th>
+            <th>Consumed (Out)</th>
+            <th>Usage Value ({{ currency_symbol }})</th>
+            <th>Current Stock</th>
+            <th>Asset Value ({{ currency_symbol }})</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in product_usage_report %}
+            <tr>
+              <td class="fw-semibold">
+                <a href="{% url 'product_detail' row.product.id %}" class="text-body text-decoration-none">
+                  {{ row.product.name }}
+                </a>
+              </td>
+              <td><span class="badge-neutral">{{ row.product.category.name }}</span></td>
+              <td class="text-nowrap">{{ row.in_qty }} {{ row.product.unit }}</td>
+              <td class="text-primary fw-semibold text-nowrap">{% money row.in_amount %}</td>
+              <td class="text-nowrap">{{ row.out_qty }} {{ row.product.unit }}</td>
+              <td class="text-danger fw-semibold text-nowrap">{% money row.out_amount %}</td>
+              <td class="text-nowrap"><strong>{{ row.current_stock }} {{ row.product.unit }}</strong></td>
+              <td class="text-success fw-bold text-nowrap">{% money row.stock_value %}</td>
+              <td><span class="badge {{ row.badge_class }}">{{ row.status }}</span></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="9" class="text-center py-4 text-secondary">No movement activity for products in this period.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function initReportCharts() {
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const textColor = isDark ? '#cbd5e1' : '#334155';
+  const subTextColor = isDark ? '#9BAAA1' : '#64748b';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.06)';
+
+  // Top Consumed Chart
+  const topCtx = document.getElementById('topConsumedChart');
+  if (topCtx && typeof Chart !== 'undefined') {
+    const existingTop = Chart.getChart(topCtx);
+    if (existingTop) existingTop.destroy();
+
+    const currency = topCtx.dataset.currency || window.INVENPRO_CURRENCY || '₹';
+    let labels = [];
+    let values = [];
+    try {
+      labels = JSON.parse(topCtx.dataset.labels || '[]');
+      values = JSON.parse(topCtx.dataset.values || '[]');
+    } catch (e) {
+      console.error('Error parsing top consumed chart data:', e);
+    }
+
+    if (values.length > 0) {
+      new Chart(topCtx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Usage Value (' + currency + ')',
+            data: values,
+            backgroundColor: '#ef4444',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) { return 'Usage: ' + currency + ' ' + Number(ctx.raw || 0).toFixed(2); }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: subTextColor },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: subTextColor,
+                callback: function(v) { return currency + ' ' + v; }
+              },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
+    } else if (topCtx.parentElement) {
+      topCtx.parentElement.innerHTML = '<div class="text-secondary text-center py-5"><i class="bi bi-info-circle me-1"></i>No consumed products in this period.</div>';
+    }
+  }
+
+  // Expense Categories Doughnut
+  const expCtx = document.getElementById('expenseCategoryChart');
+  if (expCtx && typeof Chart !== 'undefined') {
+    const existingExp = Chart.getChart(expCtx);
+    if (existingExp) existingExp.destroy();
+
+    const expCurrency = expCtx.dataset.currency || window.INVENPRO_CURRENCY || '₹';
+    let expLabels = [];
+    let expValues = [];
+    try {
+      expLabels = JSON.parse(expCtx.dataset.labels || '[]');
+      expValues = JSON.parse(expCtx.dataset.values || '[]');
+    } catch (e) {
+      console.error('Error parsing expense chart data:', e);
+    }
+
+    if (expValues.length > 0) {
+      new Chart(expCtx, {
+        type: 'doughnut',
+        data: {
+          labels: expLabels,
+          datasets: [{
+            data: expValues,
+            backgroundColor: [
+              '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#64748b', '#14b8a6'
+            ]
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, color: textColor } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) { return ' ' + expCurrency + ' ' + Number(ctx.raw || 0).toFixed(2); }
+              }
+            }
+          }
+        }
+      });
+    } else if (expCtx.parentElement) {
+      expCtx.parentElement.innerHTML = '<div class="text-secondary text-center py-5"><i class="bi bi-info-circle me-1"></i>No operating expenses recorded for this period.</div>';
+    }
+  }
+
+  // Preset selector auto-submit
+  const presetSelector = document.getElementById('preset_selector');
+  if (presetSelector) {
+    presetSelector.addEventListener('change', function() {
+      if (this.value !== 'custom') {
+        const form = document.getElementById('reportFilterForm');
+        if (form) form.submit();
+      }
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initReportCharts);
+} else {
+  initReportCharts();
+}
+</script>
+{% endblock %}
+

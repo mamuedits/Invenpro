@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load static currency_tags %}
+
+{% block title %}Smart Stock Alerts & Runway Analysis – Invenpro{% endblock %}
+{% block page_title %}Smart Stock Alerts & Predictive Runway{% endblock %}
+
+{% block content %}
+<!-- Unique Feature Header Hero (Forest Green SaaS Theme) -->
+<div class="dashboard-hero-clean mb-4">
+  <div class="row align-items-center">
+    <div class="col-md-8">
+      <span class="hero-pill mb-2">
+        <i class="bi bi-stars text-warning me-1"></i> Invenpro Intelligent Runway Engine
+      </span>
+      <h3 class="fw-bold mb-1 text-white">Smart Stock Alert & Consumption Analysis System</h3>
+      <p class="mb-0 text-white-50 small" style="max-width: 680px;">
+        Invenpro goes beyond basic static thresholds: it calculates your business's dynamic daily burn rate over the trailing 7 days and projects the exact depletion runway in days.
+      </p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+      <a href="{% url 'stock_in' %}" class="btn btn-accent text-dark fw-bold px-3 shadow-sm">
+        <i class="bi bi-cart-plus me-1"></i> Replenish Stock Now
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Severity Stat Counters (3 Equal Clean StatCards) -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat-card-clean accent-danger">
+      <div>
+        <div class="stat-card-label">
+          <span>Critical / Depleted</span>
+          <div class="stat-card-icon-wrap" style="color: var(--danger);"><i class="bi bi-exclamation-octagon-fill"></i></div>
+        </div>
+        <div class="stat-card-value text-danger">{{ critical_count }}</div>
+      </div>
+      <div class="stat-card-subtext">&le; 2 days remaining runway</div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="stat-card-clean accent-yellow">
+      <div>
+        <div class="stat-card-label">
+          <span>Warning / Low Stock</span>
+          <div class="stat-card-icon-wrap" style="color: #b45309;"><i class="bi bi-clock-history"></i></div>
+        </div>
+        <div class="stat-card-value text-warning">{{ warning_count }}</div>
+      </div>
+      <div class="stat-card-subtext">Below min buffer or &le; 5 days runway</div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="stat-card-clean accent-green">
+      <div>
+        <div class="stat-card-label">
+          <span>Healthy Buffer</span>
+          <div class="stat-card-icon-wrap" style="color: var(--success);"><i class="bi bi-shield-check"></i></div>
+        </div>
+        <div class="stat-card-value text-success">{{ healthy_count }}</div>
+      </div>
+      <div class="stat-card-subtext">Comfortable operating runway</div>
+    </div>
+  </div>
+</div>
+
+<!-- Smart Analysis Ledger Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-bold"><i class="bi bi-cpu text-primary me-2"></i>Product Depletion Forecast Matrix</h6>
+    <span class="text-secondary small">Real-time trailing 7-day burn-rate analysis</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Available</th>
+            <th>Minimum</th>
+            <th>Current Status</th>
+            <th>7-Day Consumed</th>
+            <th>Daily Burn Rate</th>
+            <th>Estimated Runway</th>
+            <th>Recommendation</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in analysis_list %}
+            <tr class="{% if row.is_out_of_stock %}alert-row-depleted{% elif row.is_low_stock %}alert-row-low{% endif %}">
+              <td>
+                <a href="{% url 'product_detail' row.product.id %}" class="fw-bold text-decoration-none">
+                  {{ row.product.name }}
+                </a>
+                <div class="text-secondary small">{{ row.product.category.name }}</div>
+              </td>
+              <td>
+                <span class="fw-bold {% if row.is_out_of_stock %}text-danger{% elif row.is_low_stock %}text-warning{% else %}text-main{% endif %}">
+                  {{ row.product.current_stock }} {{ row.product.unit }}
+                </span>
+              </td>
+              <td>{{ row.product.minimum_stock }} {{ row.product.unit }}</td>
+              <td>
+                {% if row.product.stock_status == 'Out of Stock' %}
+                  <span class="badge-status badge-depleted"><span class="pulse-dot bg-danger"></span> Out of Stock</span>
+                {% elif row.product.stock_status == 'Low Stock' %}
+                  <span class="badge-status badge-low-stock"><span class="pulse-dot bg-warning"></span> Low Stock</span>
+                {% else %}
+                  <span class="badge-status badge-healthy"><span class="pulse-dot bg-success"></span> Healthy</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="text-secondary">{{ row.consumed_7d }} {{ row.product.unit }}</span>
+              </td>
+              <td>
+                <span class="fw-semibold text-secondary">{{ row.daily_consumption }} {{ row.product.unit }}/day</span>
+              </td>
+              <td>
+                {% if row.runway_days is not None %}
+                  {% if row.runway_days <= 2 %}
+                    <span class="badge bg-danger text-white fw-bold px-2 py-1">
+                      <i class="bi bi-fire me-1"></i>{{ row.runway_days }} day{{ row.runway_days|pluralize }}
+                    </span>
+                  {% elif row.runway_days <= 5 %}
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-1">
+                      <i class="bi bi-hourglass-split me-1"></i>{{ row.runway_days }} days
+                    </span>
+                  {% else %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                      {{ row.runway_days }} days
+                    </span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-secondary small">No consumption</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.reorder_urgency == 'CRITICAL' %}
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 small">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Immediate Order
+                  </span>
+                {% elif row.reorder_urgency == 'SOON' %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 small">
+                    <i class="bi bi-cart me-1"></i> Order in 48h
+                  </span>
+                {% else %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small">
+                    <i class="bi bi-check-circle me-1"></i> Adequate Stock
+                  </span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a href="{% url 'stock_in' %}?product={{ row.product.id }}" class="btn btn-sm btn-primary py-1 px-2" style="font-size: 0.78rem;">
+                  <i class="bi bi-plus-circle me-1"></i> Restock
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="9" class="text-center py-5 text-secondary">
+                <i class="bi bi-check-circle-fill text-success fs-3 d-block mb-2"></i>
+                All products are adequately stocked!
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

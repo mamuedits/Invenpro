@@ -1,0 +1,656 @@
+{% extends 'base.html' %}
+{% load static currency_tags %}
+
+{% block title %}Invenpro{% endblock %}
+{% block page_title %}Operational Dashboard{% endblock %}
+
+{% block content %}
+<!-- Executive Interactive Hero Banner (Forest Green SaaS Theme) -->
+<div class="dashboard-hero-clean">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <span class="hero-pill">
+        <img src="/static/images/invenpro-logo.png" width="20px" height="20px" alt="Invenpro">
+        Invenpro - Inventory Management System
+      </span>
+    </div>
+    <div class="hero-pill">
+      <i class="bi bi-calendar3 text-warning"></i> {% now "l, d F Y" %}
+    </div>
+  </div>
+
+  <div class="row align-items-center g-4">
+    <div class="col-lg-8">
+      <h2 class="mb-2 text-white">
+        Welcome back, {{ user.first_name|default:user.username }}
+      </h2>
+      <p class="text-white-50 mb-3 fs-6" style="max-width: 620px;">
+        {% if is_developer %}
+        Currently inspecting workspace for <strong class="text-white">{{ user_restaurant.name }}</strong> (Allotted ID:
+        <strong class="text-warning font-monospace">{{ user_restaurant.restaurant_id }}</strong>).
+        {% else %}
+        Real-time inventory valuation, automated stock tracking, and depletion burn-rate predictions for
+        <strong class="text-white">{{ user_restaurant.name|default:user.profile.business_name|default:'Invenpro Store' }}</strong>.
+        {% endif %}
+      </p>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'smart_alerts' %}"
+          class="btn btn-sm btn-accent text-dark fw-bold px-3 shadow-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-bell-fill"></i> View Smart Runway Alerts
+        </a>
+        <a href="{% url 'report_overview' %}"
+          class="btn btn-sm btn-outline-light px-3 d-inline-flex align-items-center gap-1">
+          <i class="bi bi-graph-up-arrow"></i> Financial Analytics
+        </a>
+      </div>
+    </div>
+
+    <!-- Live Health Summary Pillbox inside Hero -->
+    <div class="col-lg-4">
+      <div class="p-3 rounded-4"
+        style="background: rgba(0, 0, 0, 0.18); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.15);">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small text-white-50 text-uppercase fw-bold letter-spacing-1">Inventory Health</span>
+          <span class="badge-hero-status py-1 px-2 small">{{ total_products }} Items</span>
+        </div>
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-white small d-flex align-items-center gap-2">
+              <span class="pulse-dot bg-success"></span> Healthy Stock
+            </span>
+            <span class="fw-bold text-white small">{{ healthy_stock_count }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-white small d-flex align-items-center gap-2">
+              <span class="pulse-dot bg-warning"></span> Low Stock Warning
+            </span>
+            <span class="fw-bold text-warning small">{{ low_stock_count }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-white small d-flex align-items-center gap-2">
+              <span class="pulse-dot bg-danger"></span> Depleted / Out of Stock
+            </span>
+            <span class="fw-bold text-danger small">{{ out_of_stock_count }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Interactive Quick Action Hub (4 Dedicated Full Cards) -->
+<div class="mb-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h6 class="fw-bold text-uppercase small text-muted mb-0">Quick Action Hub</h6>
+  </div>
+
+  <div class="row g-3">
+    <!-- Action 1: Stock In -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="action-card action-stock-in">
+        <div>
+          <div class="action-card-icon">
+            <i class="bi bi-plus-circle-fill"></i>
+          </div>
+          <div class="action-card-title">Stock In</div>
+          <div class="action-card-desc">Receive vendor delivery and replenish catalog quantities atomically.</div>
+        </div>
+        <a href="{% url 'stock_in' %}" class="action-btn-pill mt-auto">
+          <i class="bi bi-arrow-down-left-circle me-1"></i> Record Stock-In
+        </a>
+      </div>
+    </div>
+
+    <!-- Action 2: Stock Out -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="action-card action-stock-out">
+        <div>
+          <div class="action-card-icon">
+            <i class="bi bi-dash-circle-fill"></i>
+          </div>
+          <div class="action-card-title">Stock Out</div>
+          <div class="action-card-desc">Log kitchen consumption, prep ingredients, or customer sales.</div>
+        </div>
+        <a href="{% url 'stock_out' %}" class="action-btn-pill mt-auto">
+          <i class="bi bi-arrow-up-right-circle me-1"></i> Record Stock-Out
+        </a>
+      </div>
+    </div>
+
+    {% if is_admin_or_dev %}
+      <!-- Action 3 (Admin): Add Product -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="action-card action-add-prod">
+          <div>
+            <div class="action-card-icon">
+              <i class="bi bi-box-seam-fill"></i>
+            </div>
+            <div class="action-card-title">Add Product</div>
+            <div class="action-card-desc">Register new ingredients or items with minimum alert levels.</div>
+          </div>
+          <a href="{% url 'product_create' %}" class="action-btn-pill mt-auto">
+            <i class="bi bi-plus-lg me-1"></i> Add Product
+          </a>
+        </div>
+      </div>
+
+      <!-- Action 4 (Admin): Log Expense -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="action-card action-expense">
+          <div>
+            <div class="action-card-icon">
+              <i class="bi bi-receipt-cutoff"></i>
+            </div>
+            <div class="action-card-title">Record Expense</div>
+            <div class="action-card-desc">Track utility bills, facility rent, chef wages, and packaging.</div>
+          </div>
+          <a href="{% url 'expense_create' %}" class="action-btn-pill mt-auto">
+            <i class="bi bi-receipt me-1"></i> Record Expense
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <!-- Action 3 (Staff): Smart Stock Alerts -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="action-card action-add-prod">
+          <div>
+            <div class="action-card-icon">
+              <i class="bi bi-bell-fill"></i>
+            </div>
+            <div class="action-card-title">Stock Alerts</div>
+            <div class="action-card-desc">View ingredients running low to alert chef and kitchen team.</div>
+          </div>
+          <a href="{% url 'smart_alerts' %}" class="action-btn-pill mt-auto">
+            <i class="bi bi-exclamation-triangle me-1"></i> View Alerts ({{ total_alerts_count }})
+          </a>
+        </div>
+      </div>
+
+      <!-- Action 4 (Staff): Movement History -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="action-card action-expense">
+          <div>
+            <div class="action-card-icon">
+              <i class="bi bi-clock-history"></i>
+            </div>
+            <div class="action-card-title">Movement Log</div>
+            <div class="action-card-desc">Inspect shift usage history and verify kitchen deductions.</div>
+          </div>
+          <a href="{% url 'transaction_list' %}" class="action-btn-pill mt-auto">
+            <i class="bi bi-journal-text me-1"></i> View History
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h6 class="fw-bold text-uppercase small text-muted mb-0">{% if is_admin_or_dev %}Key Financial &amp; Stock Metrics{% else %}Operational Inventory Metrics{% endif %}</h6>
+</div>
+
+<!-- 4 Equal StatCards (KPI Row) -->
+<div class="row g-3 mb-4">
+  {% if is_admin_or_dev %}
+    <!-- Admin KPI 1: Total Products -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-green">
+        <div>
+          <div class="stat-card-label">
+            <span>Total Products</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-boxes"></i></div>
+          </div>
+          <div class="stat-card-value">{{ total_products }}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-tag me-1 text-success"></i>In active catalog</div>
+      </div>
+    </div>
+
+    <!-- Admin KPI 2: Total Inventory Value -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-yellow">
+        <div>
+          <div class="stat-card-label">
+            <span>Inventory Valuation</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-cash-stack"></i></div>
+          </div>
+          <div class="stat-card-value">{% money total_inventory_value %}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-shield-check me-1 text-warning"></i>Current asset balance</div>
+      </div>
+    </div>
+
+    <!-- Admin KPI 3: Monthly Purchases -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-info">
+        <div>
+          <div class="stat-card-label">
+            <span>Monthly Purchases</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-cart-check"></i></div>
+          </div>
+          <div class="stat-card-value">{% money monthly_purchases %}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-arrow-down-left me-1 text-info"></i>Stock-In this month</div>
+      </div>
+    </div>
+
+    <!-- Admin KPI 4: Monthly Operating Overhead -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-danger">
+        <div>
+          <div class="stat-card-label">
+            <span>Operating Expenses</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-wallet2"></i></div>
+          </div>
+          <div class="stat-card-value">{% money monthly_expenses_amount %}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-receipt me-1 text-danger"></i>Rent, utilities &amp; overhead</div>
+      </div>
+    </div>
+  {% else %}
+    <!-- Staff KPI 1: Total Products -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-info">
+        <div>
+          <div class="stat-card-label">
+            <span>Catalog Items</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-boxes"></i></div>
+          </div>
+          <div class="stat-card-value">{{ total_products }}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-check-circle me-1 text-info"></i>Active kitchen items</div>
+      </div>
+    </div>
+
+    <!-- Staff KPI 2: Healthy Stock -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-green">
+        <div>
+          <div class="stat-card-label">
+            <span>Healthy Stock</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-shield-check"></i></div>
+          </div>
+          <div class="stat-card-value text-success">{{ healthy_stock_count }}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-hand-thumbs-up me-1 text-success"></i>Above minimum buffer</div>
+      </div>
+    </div>
+
+    <!-- Staff KPI 3: Low Stock Warnings -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-yellow">
+        <div>
+          <div class="stat-card-label">
+            <span>Low Stock Items</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-exclamation-triangle-fill"></i></div>
+          </div>
+          <div class="stat-card-value text-warning">{{ low_stock_count }}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-bell me-1 text-warning"></i>Needs reorder attention</div>
+      </div>
+    </div>
+
+    <!-- Staff KPI 4: Depleted / Out of Stock -->
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card-clean accent-danger">
+        <div>
+          <div class="stat-card-label">
+            <span>Out of Stock</span>
+            <div class="stat-card-icon-wrap"><i class="bi bi-x-octagon-fill"></i></div>
+          </div>
+          <div class="stat-card-value text-danger">{{ out_of_stock_count }}</div>
+        </div>
+        <div class="stat-card-subtext"><i class="bi bi-arrow-down-circle me-1 text-danger"></i>0.00 quantity remaining</div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h6 class="fw-bold text-uppercase small text-muted mb-0">Inventory Charts</h6>
+</div>
+
+<!-- Interactive Charts Row -->
+<div class="row g-4 mb-4">
+  <!-- 7-Day Movements Trend Chart -->
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up text-primary me-2"></i>Stock Movements (Last 7 Days)</h6>
+          <small class="text-secondary">Purchases (Stock-In) vs Usage Valuation (Stock-Out) in {{ currency_symbol }}</small>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="height: 280px;">
+          <canvas id="trendChart" data-currency="{{ currency_symbol|default:'₹' }}"
+            data-labels="{{ chart_labels_json }}" data-in="{{ chart_in_json }}"
+            data-out="{{ chart_out_json }}"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Inventory Value Breakdown Doughnut -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart text-success me-2"></i>Inventory by Category</h6>
+        <small class="text-secondary">Valuation share in {{ currency_symbol }}</small>
+      </div>
+      <div class="card-body d-flex flex-column align-items-center justify-content-center">
+        <div style="height: 240px; width: 100%;">
+          <canvas id="categoryChart" data-currency="{{ currency_symbol|default:'₹' }}"
+            data-labels="{{ category_labels_json }}" data-values="{{ category_values_json }}"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3 Highlight: Smart Stock Alert & Consumption Predictions -->
+<div class="card mb-4">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold">
+        <i class="bi bi-bell-fill text-warning me-2"></i>Smart Stock Alert & Consumption Runway
+      </h6>
+      <small class="text-secondary">Predictive depletion analysis based on 7-day trailing average daily burn
+        rate</small>
+    </div>
+    <a href="{% url 'smart_alerts' %}" class="btn btn-sm btn-outline-primary">
+      View Full Analysis <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Available Stock</th>
+            <th>Min Threshold</th>
+            <th>Stock Status</th>
+            <th>Daily Burn Rate</th>
+            <th>Estimated Runway</th>
+            <th class="text-end">Quick Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in smart_alerts_preview %}
+          <tr>
+            <td>
+              <div class="fw-bold">{{ alert.product.name }}</div>
+              <small class="text-secondary">{{ alert.product.category.name }}</small>
+            </td>
+            <td>
+              <span class="fw-semibold">{{ alert.product.current_stock }} {{ alert.product.unit }}</span>
+            </td>
+            <td>{{ alert.product.minimum_stock }} {{ alert.product.unit }}</td>
+            <td>
+              {% if alert.status_code == 'OUT_OF_STOCK' %}
+              <span class="badge-status badge-depleted"><span class="pulse-dot bg-danger"></span> Out of Stock</span>
+              {% elif alert.status_code == 'LOW_STOCK' %}
+              <span class="badge-status badge-low-stock"><span class="pulse-dot bg-warning"></span> Low Stock</span>
+              {% else %}
+              <span class="badge-status badge-healthy"><span class="pulse-dot bg-success"></span> Healthy</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="text-secondary">{{ alert.avg_daily_consumption }} {{ alert.product.unit }}/day</span>
+            </td>
+            <td>
+              {% if alert.runway_days is not None %}
+              {% if alert.runway_days <= 2 %} <span class="badge bg-danger text-white fw-bold px-2 py-1"><i
+                  class="bi bi-fire me-1"></i>{{ alert.runway_days }} day{{ alert.runway_days|pluralize }}</span>
+                {% elif alert.runway_days <= 5 %} <span class="badge bg-warning text-dark fw-bold px-2 py-1"><i
+                    class="bi bi-hourglass-split me-1"></i>{{ alert.runway_days }} days</span>
+                  {% else %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">{{ alert.runway_days }} days</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-secondary small">No usage data</span>
+                  {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{% url 'stock_in' %}?product={{ alert.product.id }}" class="btn btn-sm btn-primary py-1 px-2"
+                style="font-size: 0.78rem;">
+                <i class="bi bi-plus-circle me-1"></i> Restock
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-4 text-secondary">
+              <i class="bi bi-check-circle-fill text-success fs-4 d-block mb-1"></i>
+              All inventory levels are healthy! No stock alerts or shortage warnings.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Section 4: Recent Movement Stream -->
+<div class="card mb-4">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Recent Stock Movements</h6>
+      <small class="text-secondary">Latest inventory receipts, consumption entries, and adjustments</small>
+    </div>
+    <a href="{% url 'transaction_list' %}" class="btn btn-sm btn-outline-secondary">
+      View All Transactions <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Product</th>
+            <th>Quantity</th>
+            {% if is_admin_or_dev %}
+              <th>Total Amount</th>
+            {% endif %}
+            <th>Date &amp; Time</th>
+            <th>Operator</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in recent_transactions %}
+          <tr>
+            <td>
+              {% if tx.transaction_type == 'IN' %}
+              <span class="badge-status badge-healthy"><i class="bi bi-arrow-down-left"></i> Stock-In</span>
+              {% elif tx.transaction_type == 'OUT' %}
+              <span class="badge-status badge-depleted"><i class="bi bi-arrow-up-right"></i> Stock-Out</span>
+              {% else %}
+              <span class="badge bg-secondary-subtle text-secondary px-2 py-1 rounded-pill small"><i
+                  class="bi bi-sliders"></i> Audit Adjustment</span>
+              {% endif %}
+            </td>
+            <td class="fw-semibold">
+              <a href="{% url 'product_detail' tx.product.id %}" class="text-decoration-none">
+                {{ tx.product.name }}
+              </a>
+            </td>
+            <td>{{ tx.quantity }} {{ tx.product.unit }}</td>
+            {% if is_admin_or_dev %}
+              <td>{% money tx.total_amount %}</td>
+            {% endif %}
+            <td class="text-secondary small">{{ tx.created_at|date:"M d, H:i" }}</td>
+            <td><span class="badge-neutral">{{ tx.user.username }}</span></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-secondary">
+              No recent transactions recorded.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function initDashboardCharts() {
+    // 1. 7-Day Movements Trend Chart
+    var trendCanvas = document.getElementById('trendChart');
+    if (trendCanvas && typeof Chart !== 'undefined') {
+      var existingTrend = Chart.getChart(trendCanvas);
+      if (existingTrend) {
+        existingTrend.destroy();
+      }
+
+      var currency = trendCanvas.dataset.currency || '₹';
+      var labels = [];
+      var inData = [];
+      var outData = [];
+      try {
+        labels = JSON.parse(trendCanvas.dataset.labels || '[]');
+        inData = JSON.parse(trendCanvas.dataset.in || '[]');
+        outData = JSON.parse(trendCanvas.dataset.out || '[]');
+      } catch (e) {
+        console.error('Error parsing trend chart data:', e);
+      }
+
+      var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+      var textColor = isDark ? '#cbd5e1' : '#334155';
+      var subTextColor = isDark ? '#94a3b8' : '#64748b';
+      var gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+
+      new Chart(trendCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Purchases (Stock-In ' + currency + ')',
+              data: inData,
+              backgroundColor: 'rgba(8, 116, 67, 0.85)',
+              borderColor: '#087443',
+              borderWidth: 1,
+              borderRadius: 6
+            },
+            {
+              label: 'Usage Value (Stock-Out ' + currency + ')',
+              data: outData,
+              backgroundColor: 'rgba(220, 69, 69, 0.85)',
+              borderColor: '#DC4545',
+              borderWidth: 1,
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: textColor }
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  return context.dataset.label + ': ' + currency + ' ' + Number(context.raw || 0).toFixed(2);
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: subTextColor },
+              grid: { color: gridColor }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: subTextColor,
+                callback: function (value) { return currency + ' ' + value; }
+              },
+              grid: { color: gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Category Doughnut Chart
+    var catCanvas = document.getElementById('categoryChart');
+    if (catCanvas && typeof Chart !== 'undefined') {
+      var existingCat = Chart.getChart(catCanvas);
+      if (existingCat) {
+        existingCat.destroy();
+      }
+
+      var catCurrency = catCanvas.dataset.currency || '₹';
+      var catLabels = [];
+      var catValues = [];
+      try {
+        catLabels = JSON.parse(catCanvas.dataset.labels || '[]');
+        catValues = JSON.parse(catCanvas.dataset.values || '[]');
+      } catch (e) {
+        console.error('Error parsing category chart data:', e);
+      }
+
+      var hasPositiveData = catValues.length > 0 && catValues.some(function (v) { return Number(v) > 0; });
+      if (hasPositiveData) {
+        var isDarkCat = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        var textCatColor = isDarkCat ? '#cbd5e1' : '#334155';
+
+        new Chart(catCanvas, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels,
+            datasets: [{
+              data: catValues,
+              backgroundColor: [
+                '#087443', '#16A36A', '#F5C400', '#0284C7', '#DC4545', '#718078', '#064E3B', '#8b5cf6', '#ec4899', '#f97316'
+              ],
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  boxWidth: 12,
+                  color: textCatColor
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return ' ' + context.label + ': ' + catCurrency + ' ' + Number(context.raw || 0).toFixed(2);
+                  }
+                }
+              }
+            }
+          }
+        });
+      } else {
+        if (catCanvas.parentElement) {
+          catCanvas.parentElement.innerHTML = '<div class="text-secondary text-center py-4 small"><i class="bi bi-box-seam me-1"></i>No inventory stock value recorded yet.</div>';
+        }
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDashboardCharts);
+  } else {
+    initDashboardCharts();
+  }
+</script>
+{% endblock %}
